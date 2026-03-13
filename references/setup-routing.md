@@ -441,15 +441,15 @@ The correct commands to run research-assist are:
 
 ```bash
 # Full digest
-uv run --directory ~/.openclaw/skills/research-assist \
+uv run --project ~/.openclaw/skills/research-assist \
   research-assist --action digest --config ~/.openclaw/skills/research-assist/config.json
 
 # Profile refresh
-uv run --directory ~/.openclaw/skills/research-assist \
+uv run --project ~/.openclaw/skills/research-assist \
   research-assist --action profile-refresh --config ~/.openclaw/skills/research-assist/config.json
 
 # Ad-hoc search
-uv run --directory ~/.openclaw/skills/research-assist \
+uv run --project ~/.openclaw/skills/research-assist \
   research-assist --action search --query "your query" --top 5
 ```
 

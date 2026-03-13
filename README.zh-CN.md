@@ -158,7 +158,7 @@ unzip dist/research-assist-skill-v*.zip -d /tmp/research-assist-skill
 通过便携包安装后，请把 CLI 指向已安装的 skill 根目录：
 
 ```bash
-uv run --directory ~/.openclaw/skills/research-assist \
+uv run --project ~/.openclaw/skills/research-assist \
   research-assist --action digest --config ~/.openclaw/skills/research-assist/config.json
 ```
 

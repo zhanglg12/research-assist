@@ -83,6 +83,6 @@ The packaged root includes `install.sh`, which:
 After installation, run commands against the installed skill root, for example:
 
 ```bash
-uv run --directory ~/.openclaw/skills/research-assist \
+uv run --project ~/.openclaw/skills/research-assist \
   research-assist --action digest --config ~/.openclaw/skills/research-assist/config.json
 ```

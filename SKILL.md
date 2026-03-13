@@ -11,25 +11,25 @@ An OpenClaw skill that turns Zotero evidence into a profile-driven arXiv digest,
 
 ```bash
 # Full digest: profile check → arXiv retrieval → rank → markdown output
-uv run --directory ~/.openclaw/skills/research-assist \
+uv run --project ~/.openclaw/skills/research-assist \
   research-assist --action digest --config ~/.openclaw/skills/research-assist/config.json
 
 # Ad-hoc arXiv search
-uv run --directory ~/.openclaw/skills/research-assist \
+uv run --project ~/.openclaw/skills/research-assist \
   research-assist --action search --query "gaussian process" --top 5
 
 # Check profile refresh status
-uv run --directory ~/.openclaw/skills/research-assist \
+uv run --project ~/.openclaw/skills/research-assist \
   research-assist --action profile-refresh --config ~/.openclaw/skills/research-assist/config.json
 
 # Zotero MCP server (for profile evidence + feedback writeback)
-uv run --directory ~/.openclaw/skills/research-assist research-assist-zotero-mcp
+uv run --project ~/.openclaw/skills/research-assist research-assist-zotero-mcp
 ```
 
 Or via Python module:
 
 ```bash
-uv run --directory ~/.openclaw/skills/research-assist \
+uv run --project ~/.openclaw/skills/research-assist \
   python -m codex_research_assist --action digest --config ~/.openclaw/skills/research-assist/config.json
 ```
 

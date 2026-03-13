@@ -158,7 +158,7 @@ The packaged skill ships with `install.sh`, which copies the runtime files into 
 After package install, run the CLI against the installed skill root:
 
 ```bash
-uv run --directory ~/.openclaw/skills/research-assist \
+uv run --project ~/.openclaw/skills/research-assist \
   research-assist --action digest --config ~/.openclaw/skills/research-assist/config.json
 ```
 
