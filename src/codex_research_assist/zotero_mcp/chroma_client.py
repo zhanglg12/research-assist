@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import chromadb
+import requests
 from chromadb import Documents, EmbeddingFunction, Embeddings
 from chromadb.config import Settings
 
@@ -65,6 +66,51 @@ class OpenAIEmbeddingFunction(EmbeddingFunction):
     def build_from_config(cls, config: dict[str, Any]) -> "OpenAIEmbeddingFunction":
         return cls(
             model_name=str(config.get("model_name") or "text-embedding-3-small"),
+            base_url=config.get("base_url"),
+        )
+
+
+class OllamaEmbeddingFunction(EmbeddingFunction):
+    """Local Ollama embedding backend via the OpenAI-compatible HTTP API."""
+
+    def __init__(self, model_name: str = "qwen3-embedding:0.6b", api_key: str | None = None, base_url: str | None = None):
+        self.model_name = model_name
+        self.api_key = api_key or os.getenv("OLLAMA_API_KEY") or "ollama"
+        self.base_url = (base_url or os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434/v1").rstrip("/")
+
+    def __call__(self, input: Documents) -> Embeddings:
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        response = requests.post(
+            f"{self.base_url}/embeddings",
+            json={"model": self.model_name, "input": list(input)},
+            headers=headers,
+            timeout=120,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        records = payload.get("data")
+        if not isinstance(records, list):
+            raise ValueError("Ollama embedding response missing 'data' list")
+        embeddings = [record.get("embedding") for record in records]
+        if any(not isinstance(embedding, list) for embedding in embeddings):
+            raise ValueError("Ollama embedding response missing embedding vectors")
+        return embeddings
+
+    def name(self=None) -> str:  # type: ignore[override]
+        if self is None:
+            return "ollama"
+        return f"ollama:{self.model_name}:{self.base_url}"
+
+    def get_config(self) -> dict[str, Any]:
+        return {"model_name": self.model_name, "base_url": self.base_url}
+
+    @classmethod
+    def build_from_config(cls, config: dict[str, Any]) -> "OllamaEmbeddingFunction":
+        return cls(
+            model_name=str(config.get("model_name") or "qwen3-embedding:0.6b"),
+            api_key=config.get("api_key"),
             base_url=config.get("base_url"),
         )
 
@@ -235,8 +281,10 @@ class ChromaClient:
             base_url = self.embedding_config.get("base_url")
             return GeminiEmbeddingFunction(model_name=model_name, api_key=api_key, base_url=base_url)
         if self.embedding_model == "qwen":
-            model_name = self.embedding_config.get("model_name", "Qwen/Qwen3-Embedding-0.6B")
-            return HuggingFaceEmbeddingFunction(model_name=model_name)
+            model_name = self.embedding_config.get("model_name", "qwen3-embedding:0.6b")
+            api_key = self.embedding_config.get("api_key", "ollama")
+            base_url = self.embedding_config.get("base_url", "http://localhost:11434/v1")
+            return OllamaEmbeddingFunction(model_name=model_name, api_key=api_key, base_url=base_url)
         if self.embedding_model == "embeddinggemma":
             model_name = self.embedding_config.get("model_name", "google/embeddinggemma-300m")
             return HuggingFaceEmbeddingFunction(model_name=model_name)
@@ -308,6 +356,10 @@ def create_chroma_client(config_path: str | Path | None = None) -> ChromaClient:
         if os.getenv("GEMINI_BASE_URL"):
             embedding_config["base_url"] = os.getenv("GEMINI_BASE_URL")
         embedding_config["model_name"] = os.getenv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-001")
+    if embedding_model == "qwen":
+        embedding_config["base_url"] = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+        embedding_config["model_name"] = os.getenv("OLLAMA_EMBEDDING_MODEL", "qwen3-embedding:0.6b")
+        embedding_config["api_key"] = os.getenv("OLLAMA_API_KEY", "ollama")
     if embedding_model == "fastembed":
         embedding_config["model_name"] = os.getenv("FASTEMBED_MODEL", "BAAI/bge-small-en-v1.5")
 

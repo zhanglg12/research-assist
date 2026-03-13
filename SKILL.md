@@ -11,22 +11,26 @@ An OpenClaw skill that turns Zotero evidence into a profile-driven arXiv digest,
 
 ```bash
 # Full digest: profile check → arXiv retrieval → rank → markdown output
-uv run research-assist --action digest --config path/to/config.json
+uv run --directory ~/.openclaw/skills/research-assist \
+  research-assist --action digest --config ~/.openclaw/skills/research-assist/config.json
 
 # Ad-hoc arXiv search
-uv run research-assist --action search --query "gaussian process" --top 5
+uv run --directory ~/.openclaw/skills/research-assist \
+  research-assist --action search --query "gaussian process" --top 5
 
 # Check profile refresh status
-uv run research-assist --action profile-refresh --config path/to/config.json
+uv run --directory ~/.openclaw/skills/research-assist \
+  research-assist --action profile-refresh --config ~/.openclaw/skills/research-assist/config.json
 
 # Zotero MCP server (for profile evidence + feedback writeback)
-uv run research-assist-zotero-mcp
+uv run --directory ~/.openclaw/skills/research-assist research-assist-zotero-mcp
 ```
 
 Or via Python module:
 
 ```bash
-python3 -m codex_research_assist --action digest --config ~/.openclaw/skills/research-assist/config.json
+uv run --directory ~/.openclaw/skills/research-assist \
+  python -m codex_research_assist --action digest --config ~/.openclaw/skills/research-assist/config.json
 ```
 
 Default config path: `~/.openclaw/skills/research-assist/config.json`
@@ -43,6 +47,9 @@ Hard rules for the host agent:
 - once `config.json` is valid, normal digest/search/render/feedback runs must not reopen setup questions
 - do not restate dormant install options during regular literature work
 - if the user asks for normal runtime work, prefer using the existing config over discussing installation
+- when setup selects optional backends or delivery routes, execute the required install/setup commands instead of only listing them
+- before leaving setup, run a minimal verification for the selected backend or route and report the result
+- only fall back to manual instructions when a step is blocked by missing secrets, missing local services, missing permissions, or a platform limitation
 
 ## Config Format
 

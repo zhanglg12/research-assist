@@ -94,7 +94,7 @@ If you already use **Claude Code**, **Codex CLI**, **Gemini CLI**, or any LLM-ba
 
 > **Read the README at `https://github.com/zlg/research-assist` and follow `references/setup-routing.md` to set up research-assist for me interactively.**
 
-The agent will clone the repo, ask you a few focused questions based on what you actually need (minimal digest, Zotero integration, email delivery, etc.), write `config.json`, and summarize what was enabled — all in one conversation.
+The agent will clone the repo, ask you a few focused questions based on what you actually need (minimal digest, Zotero integration, email delivery, etc.), write `config.json`, execute the required setup commands for the chosen backend or delivery route, and verify the result before finishing.
 
 ### Option B — Manual install
 
@@ -105,7 +105,7 @@ git clone <this-repo> && cd research-assist
 uv sync
 ```
 
-That's it. One command installs all dependencies.
+That's it. One command installs the base Python dependencies for the skill.
 
 #### 2. Set up config
 
@@ -153,7 +153,14 @@ unzip dist/research-assist-skill-v*.zip -d /tmp/research-assist-skill
 /tmp/research-assist-skill/research-assist-skill-v*/install.sh
 ```
 
-The packaged skill ships with `install.sh`, which copies the runtime files into `~/.openclaw/skills/research-assist`, creates `config.json` and `profiles/research-interest.json` if missing, and runs `uv sync` when available.
+The packaged skill ships with `install.sh`, which copies the runtime files into `~/.openclaw/skills/research-assist`, creates `config.json` and `profiles/research-interest.json` if missing, rewrites fresh runtime paths to the actual install target, and runs `uv sync` when available.
+
+After package install, run the CLI against the installed skill root:
+
+```bash
+uv run --directory ~/.openclaw/skills/research-assist \
+  research-assist --action digest --config ~/.openclaw/skills/research-assist/config.json
+```
 
 ## Pipeline stages
 
@@ -208,6 +215,18 @@ Items are matched by `item_key`, `doi`, or `title_contains`. Previous `ra-status
 ## Optional: Zotero semantic search
 
 If you want semantic neighbors (not just exact matches), configure the local search index:
+
+- The default recommended backend is `semantic_search.embedding_model = "qwen"`.
+- No extra Python package is required for the default `qwen` path beyond `uv sync`.
+- You still need a local Ollama server with `qwen3-embedding:0.6b` available:
+
+```bash
+ollama pull qwen3-embedding:0.6b
+```
+
+If setup is being driven by an agent, the agent should run that pull command and verify the backend initialization before declaring setup complete.
+
+If you do not want local semantic search yet, set `semantic_search.enabled` to `false` and the rest of the digest pipeline still works.
 
 ```bash
 uv run python - <<'PY'

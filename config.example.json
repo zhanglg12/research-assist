@@ -42,17 +42,17 @@
     ]
   },
   "semantic_search": {
-    "enabled": false,
+    "enabled": true,
     "zotero_db_path": "",
     "persist_directory": "~/.openclaw/skills/research-assist/.semantic-search",
     "collection_name": "research_assist_zotero",
-    "embedding_model": "default",
+    "embedding_model": "qwen",
     "local_group_id": null,
     "local_library_id": null,
     "extract_fulltext": false,
     "update_config": {
-      "auto_update": false,
-      "update_frequency": "manual",
+      "auto_update": true,
+      "update_frequency": "daily",
       "last_update": null,
       "update_days": 7
     },

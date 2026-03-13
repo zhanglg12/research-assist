@@ -57,6 +57,13 @@ def _review_fallback_to_system(config: dict) -> bool:
     return _config_bool(review_cfg.get("fallback_to_system", True), True)
 
 
+def _semantic_search_enabled(config: dict) -> bool:
+    semantic_cfg = config.get("semantic_search", {})
+    if not isinstance(semantic_cfg, dict):
+        return True
+    return _config_bool(semantic_cfg.get("enabled", True), True)
+
+
 def _telegram_send_enabled(config: dict) -> bool:
     delivery_cfg = config.get("delivery", {})
     if not isinstance(delivery_cfg, dict):
@@ -928,7 +935,7 @@ def action_digest(config: dict, fmt: str = "markdown", *, config_path: Path | No
                 except Exception:
                     pass
             semantic_search_fn = None
-            if config_path is not None:
+            if config_path is not None and _semantic_search_enabled(config):
                 try:
                     semantic_search = create_semantic_search(config_path=config_path)
 

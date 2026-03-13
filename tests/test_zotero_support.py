@@ -8,6 +8,7 @@ from pathlib import Path
 
 from codex_research_assist.arxiv_profile_pipeline.profile_contract import normalize_profile_payload
 from codex_research_assist.profile_refresh_output import parse_profile_refresh_output
+from codex_research_assist.zotero_mcp.chroma_client import ChromaClient
 from codex_research_assist.zotero_mcp.feedback import (
     build_feedback_note,
     decision_status_tag,
@@ -128,6 +129,20 @@ class McpRegistrationTest(unittest.TestCase):
                 "zotero_get_search_database_status",
             }.issubset(tool_names)
         )
+
+
+class QwenEmbeddingBackendTest(unittest.TestCase):
+    def test_qwen_backend_does_not_require_openai_package_at_init(self) -> None:
+        client = ChromaClient.__new__(ChromaClient)
+        client.embedding_model = "qwen"
+        client.embedding_config = {
+            "model_name": "qwen3-embedding:0.6b",
+            "base_url": "http://localhost:11434/v1",
+            "api_key": "ollama",
+        }
+
+        embedding_fn = ChromaClient._create_embedding_function(client)
+        self.assertEqual(embedding_fn.name(), "ollama:qwen3-embedding:0.6b:http://localhost:11434/v1")
 
 
 class ConfigRoundTripTest(unittest.TestCase):

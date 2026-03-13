@@ -76,5 +76,13 @@ The packaged root includes `install.sh`, which:
 
 - copies runtime files into `~/.openclaw/skills/research-assist`
 - creates `config.json` from `config.example.json` if missing
+- rewrites freshly created runtime paths (`profile_path`, `output_root`, `semantic_search.persist_directory`) to the actual install target
 - creates `profiles/research-interest.json` from the example profile if missing
 - runs `uv sync` in the installed skill directory when `uv` is available
+
+After installation, run commands against the installed skill root, for example:
+
+```bash
+uv run --directory ~/.openclaw/skills/research-assist \
+  research-assist --action digest --config ~/.openclaw/skills/research-assist/config.json
+```

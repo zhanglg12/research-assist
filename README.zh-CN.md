@@ -94,7 +94,7 @@
 
 > **读取 `https://github.com/zlg/research-assist` 的 README，然后按照 `references/setup-routing.md` 为我交互式地配置 research-assist。**
 
-agent 会自动 clone 仓库，根据你实际需要的功能（最小 digest、Zotero 集成、邮件投递等）问你几个有针对性的问题，写好 `config.json`，并总结本次启用了哪些能力——全在一次对话里完成。
+agent 会自动 clone 仓库，根据你实际需要的功能（最小 digest、Zotero 集成、邮件投递等）问你几个有针对性的问题，写好 `config.json`，执行所选后端或投递路线需要的安装命令，并在结束前做最小验证。
 
 ### 方式 B — 手动安装
 
@@ -105,12 +105,12 @@ git clone <this-repo> && cd research-assist
 uv sync
 ```
 
-就这些。一条命令安装全部依赖。
+就这些。一条命令会安装这个 skill 的基础 Python 依赖。
 
 #### 2. 配置
 
 ```bash
-# Create the skill directory and copy the example config
+# 创建 skill 目录并复制示例配置
 mkdir -p ~/.openclaw/skills/research-assist/profiles
 mkdir -p ~/.openclaw/skills/research-assist/reports
 cp config.example.json ~/.openclaw/skills/research-assist/config.json
@@ -153,7 +153,14 @@ unzip dist/research-assist-skill-v*.zip -d /tmp/research-assist-skill
 /tmp/research-assist-skill/research-assist-skill-v*/install.sh
 ```
 
-生成出来的 skill 包会自带 `install.sh`。它会把运行时文件复制到 `~/.openclaw/skills/research-assist`，在缺失时创建 `config.json` 和 `profiles/research-interest.json`，并在本机存在 `uv` 时自动执行 `uv sync`。
+生成出来的 skill 包会自带 `install.sh`。它会把运行时文件复制到 `~/.openclaw/skills/research-assist`，在缺失时创建 `config.json` 和 `profiles/research-interest.json`，把新建配置里的运行路径改写成实际安装目录，并在本机存在 `uv` 时自动执行 `uv sync`。
+
+通过便携包安装后，请把 CLI 指向已安装的 skill 根目录：
+
+```bash
+uv run --directory ~/.openclaw/skills/research-assist \
+  research-assist --action digest --config ~/.openclaw/skills/research-assist/config.json
+```
 
 ## Pipeline 阶段
 
@@ -208,6 +215,18 @@ Zotero 文库
 ## 可选：Zotero 语义搜索
 
 如果你想使用 semantic neighbors，而不只是 exact matches，需要配置本地搜索索引：
+
+- 默认推荐的后端是 `semantic_search.embedding_model = "qwen"`。
+- 默认 `qwen` 路径除了 `uv sync` 之外，不需要再额外安装 Python 包。
+- 但你仍然需要本地 Ollama 服务，并提前拉取 `qwen3-embedding:0.6b`：
+
+```bash
+ollama pull qwen3-embedding:0.6b
+```
+
+如果 setup 是由 agent 驱动的，agent 应该自己执行这条 pull 命令，并在宣告 setup 完成前验证 backend 初始化成功。
+
+如果你暂时不想启用本地 semantic search，把 `semantic_search.enabled` 设为 `false` 即可；digest 主链条仍然可以正常工作。
 
 ```bash
 uv run python - <<'PY'
