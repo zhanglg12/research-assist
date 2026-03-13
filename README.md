@@ -92,7 +92,7 @@
 
 If you already use **Claude Code**, **Codex CLI**, **Gemini CLI**, or any LLM-backed coding assistant, paste this single message into your agent:
 
-> **Read the README at `https://github.com/zlg/research-assist` and follow `references/setup-routing.md` to set up research-assist for me interactively.**
+> **Read the README at `https://github.com/zhanglg12/research-assist` and follow `references/setup-routing.md` to set up research-assist for me interactively.**
 
 The agent will clone the repo, ask you a few focused questions based on what you actually need (minimal digest, Zotero integration, email delivery, etc.), write `config.json`, execute the required setup commands for the chosen backend or delivery route, and verify the result before finishing.
 

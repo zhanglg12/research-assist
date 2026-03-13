@@ -17,7 +17,7 @@ RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 HEADERS = {
     "User-Agent": os.getenv(
         "ARXIV_UA",
-        "research-assist/0.1.0 (+https://github.com/zlg/research-assist)",
+        "research-assist/0.1.0 (+https://github.com/zhanglg12/research-assist)",
     ),
     "Accept": "application/atom+xml,application/xml;q=0.9,*/*;q=0.8",
 }

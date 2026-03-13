@@ -92,7 +92,7 @@
 
 如果你已经在用 **Claude Code**、**Codex CLI**、**Gemini CLI** 或任何由 LLM 驱动的编程助手，把下面这段话粘贴给你的 agent 就行：
 
-> **读取 `https://github.com/zlg/research-assist` 的 README，然后按照 `references/setup-routing.md` 为我交互式地配置 research-assist。**
+> **读取 `https://github.com/zhanglg12/research-assist` 的 README，然后按照 `references/setup-routing.md` 为我交互式地配置 research-assist。**
 
 agent 会自动 clone 仓库，根据你实际需要的功能（最小 digest、Zotero 集成、邮件投递等）问你几个有针对性的问题，写好 `config.json`，执行所选后端或投递路线需要的安装命令，并在结束前做最小验证。
 
