@@ -123,7 +123,7 @@ Ask the user:
 >
 > | | Add-on | What it adds | Requires |
 > |---|---|---|---|
-> | **C** | **Semantic search** | Find nearest Zotero neighbors for each candidate | Local `zotero.sqlite` + embedding model (requires B) |
+> | **C** | **Semantic search** (recommended) | Find nearest Zotero neighbors for each candidate | Embedding model (local or remote). Items synced via API -- no local `zotero.sqlite` needed |
 > | **D** | **Push delivery** | Digest sent to email or Telegram automatically | SMTP or Telegram bot credentials |
 >
 > Pick any combination: C, D, both, or neither.
@@ -147,13 +147,14 @@ Ask the user:
 
 > **Your Zotero library type?**
 >
-> 1. **Personal** (`user`) -- your own library
-> 2. **Group** (`group`) -- shared team library
+> 1. **Group** (`group`) -- shared team library (recommended, easier API key management)
+> 2. **Personal** (`user`) -- your own library
 
 Then ask:
 
 > **Your Zotero library ID?**
-> Find it at [zotero.org/settings/keys](https://www.zotero.org/settings/keys) -- the numeric "Your userID" value.
+> For **group** libraries: go to [zotero.org/groups](https://www.zotero.org/groups/), open your group, the numeric ID is in the URL.
+> For **personal** libraries: find it at [zotero.org/settings/keys](https://www.zotero.org/settings/keys) -- the numeric "Your userID" value.
 
 Then ask:
 
@@ -182,21 +183,31 @@ Ask the user:
 
 Then ask:
 
-> **Path to your local `zotero.sqlite`?**
-> Usually at `~/Zotero/zotero.sqlite` (macOS/Linux) or `%APPDATA%\Zotero\Zotero\zotero.sqlite` (Windows).
+> **How should items be synced into the semantic index?**
+>
+> | | Method | What it needs | Best for |
+> |---|---|---|---|
+> | **1** | **API sync** (recommended) | Zotero API credentials (already configured) | No desktop Zotero needed; works on servers and CI |
+> | **2** | **Local sqlite** | Path to `zotero.sqlite` on this machine | Offline use; fulltext PDF extraction |
+>
+> API sync fetches item metadata (title, abstract, tags, authors) via the Web API and embeds it locally. This is sufficient for high-quality semantic matching without PDF content.
+
+**If API sync:** leave `semantic_search.zotero_db_path` empty. The agent should run `research-assist --action sync-index` after setup.
+**If local sqlite:** ask for the path. Usually `~/Zotero/zotero.sqlite` (macOS/Linux) or `%APPDATA%\Zotero\Zotero\zotero.sqlite` (Windows).
 
 Recommendation flow:
 1. If user has Ollama -> `"qwen"` (best balance of quality, privacy, and speed)
 2. If user wants zero external services -> `"fastembed"` (works everywhere, pure Python)
 3. If user already has OpenAI/Gemini API keys -> offer the corresponding backend
 
-### Step 2.3: Fulltext and auto-update (if C selected)
+### Step 2.3: Scope collection and auto-update (if C selected)
 
 These have sensible defaults. Only mention them briefly:
 
-> **Two quick settings for semantic search:**
+> **Quick settings for semantic search:**
 >
-> - **Fulltext extraction** (default: off) -- index PDF content, not just title+abstract. ~12x slower but deeper matching.  Enable? (y/N)
+> - **Scope collection** (default: empty = whole library) -- restrict profile, feedback, and indexing to a single Zotero collection and its children. Enter a collection name or leave empty.
+> - **Fulltext extraction** (default: off, only available with local sqlite) -- index PDF content, not just title+abstract. ~12x slower but deeper matching. Enable? (y/N)
 > - **Auto-update** (default: on) -- keep index fresh automatically with ~100ms overhead per query. Keep on? (Y/n)
 
 ---
@@ -412,6 +423,7 @@ Do not turn the completion summary into another setup round. Once config is writ
     "library_id": "",
     "api_key": "",
     "library_type": "user",
+    "scope_collection": "",
     "profile_collections": [],
     "profile_tags": [],
     "feedback_default_collections": [],
@@ -453,6 +465,7 @@ Do not turn the completion summary into another setup round. Once config is writ
 | Zotero group library | `zotero.library_type` | `"group"` |
 | Library ID | `zotero.library_id` | user-provided string |
 | API key | `zotero.api_key` | user-provided string |
+| Scope to a single collection | `zotero.scope_collection` | user-provided collection name (empty = whole library) |
 | Embedding: Ollama qwen | `semantic_search.embedding_model` | `"qwen"` |
 | Embedding: fastembed | `semantic_search.embedding_model` | `"fastembed"` |
 | Embedding: OpenAI | `semantic_search.embedding_model` | `"openai"` |
@@ -472,7 +485,7 @@ Do not turn the completion summary into another setup round. Once config is writ
 | Enable fulltext extraction | `semantic_search.extract_fulltext` | `true` |
 | Disable semantic search | `semantic_search.enabled` | `false` |
 
-**Do not add fields that don't exist in the reference structure above.** There is no `zotero.enabled`, no `feedback.enabled`, no `delivery.local_output_enabled`, no `zotero.profile_basis`. Feedback writeback is controlled by `zotero.feedback_default_tags` and `zotero.feedback_default_collections` (empty arrays = disabled).
+**Do not add fields that don't exist in the reference structure above.** There is no `zotero.enabled`, no `feedback.enabled`, no `delivery.local_output_enabled`, no `zotero.profile_basis`. Feedback writeback is controlled by `zotero.feedback_default_tags` and `zotero.feedback_default_collections` (empty arrays = disabled). When `zotero.scope_collection` is set and both `profile_collections` and `feedback_default_collections` are empty, the scope collection is used as the default for both.
 
 ## Reference: Config Targets
 
@@ -492,6 +505,10 @@ uv run --project ~/.openclaw/skills/research-assist \
 # Ad-hoc search
 uv run --project ~/.openclaw/skills/research-assist \
   research-assist --action search --query "your query" --top 5
+
+# Sync Zotero API items into semantic index (no local sqlite needed)
+uv run --project ~/.openclaw/skills/research-assist \
+  research-assist --action sync-index --config ~/.openclaw/skills/research-assist/config.json
 ```
 
 Do not use `python -m research_assist.cli` or `python -m research_assist.main` -- those do not exist.

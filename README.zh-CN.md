@@ -143,6 +143,9 @@ uv run research-assist --action search --query "llm multi-agent planning" --top 
 # 检查画像是否需要刷新
 uv run research-assist --action profile-refresh --config ~/.openclaw/skills/research-assist/config.json
 
+# 通过 Zotero API 将条目同步到语义索引（无需本地 sqlite）
+uv run research-assist --action sync-index --config ~/.openclaw/skills/research-assist/config.json
+
 # 在 agent patch 合并后重新渲染 digest
 uv run research-assist --action render-digest \
   --config ~/.openclaw/skills/research-assist/config.json \

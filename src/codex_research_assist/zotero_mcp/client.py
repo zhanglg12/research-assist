@@ -167,6 +167,32 @@ class ZoteroClient:
             "extra": _as_text(data.get("extra")) or None,
         }
 
+    def get_items_raw(
+        self,
+        *,
+        collection_names: list[str] | None = None,
+        limit: int = 500,
+        include_children: bool = True,
+    ) -> list[dict[str, Any]]:
+        """Return raw API entries, optionally scoped to collections."""
+        if collection_names:
+            collection_map = self.resolve_collection_keys(collection_names, include_children=include_children)
+            if collection_map:
+                seen_keys: set[str] = set()
+                items: list[dict[str, Any]] = []
+                for collection_key in collection_map.values():
+                    entries = self._filter_items(self._everything(self.zot.collection_items(collection_key)))
+                    for entry in entries:
+                        key = str(entry.get("data", {}).get("key") or "")
+                        if not key or key in seen_keys:
+                            continue
+                        seen_keys.add(key)
+                        items.append(entry)
+                        if len(items) >= limit:
+                            return items
+                return items
+        return self._filter_items(self._everything(self.zot.top()))[:limit]
+
     def get_profile_items(
         self,
         *,
@@ -437,6 +463,7 @@ class ZoteroClient:
         remove_tags: list[str] | None = None,
         limit: int = 50,
         dry_run: bool = True,
+        restrict_to_collection_keys: set[str] | None = None,
     ) -> dict[str, Any]:
         add_tags = [tag.strip() for tag in (add_tags or []) if tag and tag.strip()]
         remove_tags = [tag.strip() for tag in (remove_tags or []) if tag and tag.strip()]
@@ -448,6 +475,16 @@ class ZoteroClient:
         updated: list[dict[str, Any]] = []
         for entry in matched:
             data = entry["data"]
+            # Scope guard
+            if restrict_to_collection_keys is not None:
+                item_collections = set(data.get("collections", []))
+                if not item_collections.intersection(restrict_to_collection_keys):
+                    planned.append({
+                        "item_key": data.get("key"),
+                        "title": data.get("title"),
+                        "status": "out_of_scope",
+                    })
+                    continue
             current_tags = [tag.get("tag", "").strip() for tag in data.get("tags", []) if tag.get("tag")]
             next_tags = [tag for tag in current_tags if tag.lower() not in {name.lower() for name in remove_tags}]
             for tag in add_tags:
@@ -580,7 +617,7 @@ class ZoteroClient:
             "updated": updated,
         }
 
-    def apply_feedback(self, payload: dict[str, Any], *, dry_run: bool = True) -> dict[str, Any]:
+    def apply_feedback(self, payload: dict[str, Any], *, dry_run: bool = True, restrict_to_collection_keys: set[str] | None = None) -> dict[str, Any]:
         decisions = payload["decisions"]
         planned: list[dict[str, Any]] = []
         applied: list[dict[str, Any]] = []
@@ -603,6 +640,21 @@ class ZoteroClient:
                 continue
 
             data = entry["data"]
+
+            # Scope guard: skip items outside the allowed collections
+            if restrict_to_collection_keys is not None:
+                item_collections = set(data.get("collections", []))
+                if not item_collections.intersection(restrict_to_collection_keys):
+                    planned.append(
+                        {
+                            "status": "out_of_scope",
+                            "item_key": data.get("key"),
+                            "title": data.get("title"),
+                            "decision": decision["decision"],
+                            "note_created": False,
+                        }
+                    )
+                    continue
             if decision["decision"] == "unset":
                 planned.append(
                     {

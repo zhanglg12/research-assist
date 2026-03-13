@@ -230,12 +230,48 @@ class LocalZoteroReader:
                 return int(row.get("libraryID"))
         raise KeyError(f"groupID not found in local Zotero database: {group_id}")
 
+    def _resolve_collection_ids(
+        self, names: list[str], *, library_id: int | None = None,
+    ) -> list[int]:
+        """Resolve collection names to IDs including all descendant collections."""
+        conn = self._get_connection()
+        lowered = {n.strip().lower() for n in names if n.strip()}
+        if not lowered:
+            return []
+        # Find seed collections matching by name
+        lib_clause = "AND c.libraryID = ?" if library_id is not None else ""
+        lib_params: list[Any] = [library_id] if library_id is not None else []
+        seeds: list[int] = []
+        for row in conn.execute(
+            f"SELECT c.collectionID, c.collectionName FROM collections c WHERE 1=1 {lib_clause}",
+            lib_params,
+        ):
+            if row["collectionName"].strip().lower() in lowered:
+                seeds.append(row["collectionID"])
+        if not seeds:
+            return []
+        # Expand to include all descendants
+        resolved = set(seeds)
+        queue = list(seeds)
+        while queue:
+            current = queue.pop(0)
+            for row in conn.execute(
+                "SELECT collectionID FROM collections WHERE parentCollectionID = ?",
+                (current,),
+            ):
+                child = row["collectionID"]
+                if child not in resolved:
+                    resolved.add(child)
+                    queue.append(child)
+        return sorted(resolved)
+
     def get_items_with_text(
         self,
         limit: int | None = None,
         include_fulltext: bool = False,
         *,
         library_id: int | None = None,
+        collection_names: list[str] | None = None,
     ) -> list[IndexedZoteroItem]:
         conn = self._get_connection()
         query = """
@@ -302,6 +338,19 @@ class LocalZoteroReader:
                 "WHERE it.typeName NOT IN ('attachment', 'note', 'annotation') AND i.libraryID = ?",
             )
             params.append(int(library_id))
+        if collection_names:
+            # Resolve collection IDs (including children) then filter items
+            coll_ids = self._resolve_collection_ids(collection_names, library_id=library_id)
+            if coll_ids:
+                placeholders = ",".join("?" for _ in coll_ids)
+                query = query.replace(
+                    "ORDER BY i.dateModified DESC",
+                    f"AND i.itemID IN (SELECT ci.itemID FROM collectionItems ci WHERE ci.collectionID IN ({placeholders})) ORDER BY i.dateModified DESC",
+                )
+                params.extend(coll_ids)
+            else:
+                # No matching collections found — return empty
+                return []
         if limit:
             query += f" LIMIT {int(limit)}"
 

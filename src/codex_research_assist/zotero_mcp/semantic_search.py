@@ -40,7 +40,6 @@ class ResearchAssistSemanticSearch:
         self.config_path = str(config_path) if config_path is not None else None
         self.db_path = str(db_path) if db_path is not None else None
         self.update_config = self._load_update_config()
-        self._require_local_db()
 
     def _load_update_config(self) -> dict[str, Any]:
         config = {
@@ -94,6 +93,13 @@ class ResearchAssistSemanticSearch:
                 f"local Zotero database not found: {db_path}. "
                 "Download/sync `zotero.sqlite` first, then retry semantic search."
             )
+
+    def _safe_db_path(self) -> str | None:
+        """Return the local zotero.sqlite path, or None when not configured."""
+        try:
+            return self._resolve_db_path()
+        except FileNotFoundError:
+            return None
 
     def should_update_database(self) -> bool:
         if not self.update_config.get("auto_update", False):
@@ -201,6 +207,7 @@ class ResearchAssistSemanticSearch:
         extract_fulltext: bool = False,
         force_rebuild: bool = False,
     ) -> list[dict[str, Any]]:
+        self._require_local_db()
         LOG.info("Fetching items from local Zotero database...")
         pdf_max_pages = None
         zotero_db_path = self.db_path
@@ -228,6 +235,7 @@ class ResearchAssistSemanticSearch:
                 limit=limit,
                 include_fulltext=extract_fulltext,
                 library_id=scoped_library_id,
+                collection_names=[self.cfg.scope_collection] if self.cfg.scope_collection else None,
             )
             api_items: list[dict[str, Any]] = []
             for item in local_items:
@@ -254,6 +262,64 @@ class ResearchAssistSemanticSearch:
                     }
                 )
             return api_items
+
+    def sync_from_api(
+        self,
+        *,
+        collection_names: list[str] | None = None,
+        limit: int = 500,
+        force_rebuild: bool = False,
+    ) -> dict[str, Any]:
+        """Fetch items from Zotero API and index into ChromaDB.
+
+        Works without a local zotero.sqlite — items are pulled via the
+        Zotero Web API and embedded directly into the vector store.
+        """
+        if force_rebuild:
+            self.chroma_client.reset_collection()
+
+        from .client import ZoteroClient
+
+        client = ZoteroClient(self.cfg.library_id, self.cfg.api_key, self.cfg.library_type)
+
+        effective_collections = list(collection_names or [])
+        if not effective_collections and self.cfg.scope_collection:
+            effective_collections = [self.cfg.scope_collection]
+
+        items = client.get_items_raw(
+            collection_names=effective_collections if effective_collections else None,
+            limit=limit,
+        )
+        if not items:
+            return {
+                "total_items": 0,
+                "processed_items": 0,
+                "source": "api",
+                "scope_collections": effective_collections or ["all"],
+            }
+
+        ids: list[str] = []
+        documents: list[str] = []
+        metadatas: list[dict[str, Any]] = []
+        for item in items:
+            key = item.get("key") or item.get("data", {}).get("key", "")
+            if not key:
+                continue
+            ids.append(key)
+            documents.append(self._create_document_text(item))
+            metadatas.append(self._create_metadata(item))
+
+        self.chroma_client.upsert_documents(documents=documents, metadatas=metadatas, ids=ids)
+        self.update_config["last_update"] = datetime.now().isoformat()
+        self._save_update_config()
+
+        return {
+            "total_items": len(items),
+            "processed_items": len(ids),
+            "source": "api",
+            "scope_collections": effective_collections or ["all"],
+            "embedding_model": self.chroma_client.embedding_model,
+        }
 
     def update_database(
         self,
@@ -392,7 +458,7 @@ class ResearchAssistSemanticSearch:
             "embedding_model": collection_info.get("embedding_model"),
             "error": collection_info.get("error"),
             "update_config": db_status.get("update_config"),
-            "zotero_db_path": self._resolve_db_path(),
+            "zotero_db_path": self._safe_db_path(),
         }
 
 

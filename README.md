@@ -143,6 +143,9 @@ uv run research-assist --action search --query "llm multi-agent planning" --top 
 # Check if profile needs refresh
 uv run research-assist --action profile-refresh --config ~/.openclaw/skills/research-assist/config.json
 
+# Sync Zotero API items into semantic index (no local sqlite needed)
+uv run research-assist --action sync-index --config ~/.openclaw/skills/research-assist/config.json
+
 # Re-render digest after agent patches are merged
 uv run research-assist --action render-digest \
   --config ~/.openclaw/skills/research-assist/config.json \

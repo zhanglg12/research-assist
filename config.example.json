@@ -34,6 +34,7 @@
     "library_id": "",
     "api_key": "",
     "library_type": "user",
+    "scope_collection": "",
     "profile_collections": [],
     "profile_tags": [],
     "feedback_default_collections": [],

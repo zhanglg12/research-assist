@@ -1069,14 +1069,44 @@ def action_profile_refresh(config: dict) -> str:
             pass
 
 
+def action_sync_index(config: dict, *, config_path: Path | None = None, force_rebuild: bool = False) -> str:
+    """Sync Zotero items into the semantic search index via API."""
+    LOG.info("Syncing Zotero items into semantic search index via API...")
+    if not _semantic_search_enabled(config):
+        return "Semantic search is disabled in config. Set semantic_search.enabled=true first."
+    try:
+        semantic_search = create_semantic_search(config_path=config_path)
+    except Exception as exc:
+        return f"Failed to initialize semantic search: {exc}"
+
+    zotero_cfg = config.get("zotero", {})
+    scope = str(zotero_cfg.get("scope_collection") or "").strip()
+    collection_names = [scope] if scope else None
+
+    result = semantic_search.sync_from_api(
+        collection_names=collection_names,
+        force_rebuild=force_rebuild,
+    )
+    lines = [
+        "Sync complete",
+        f"  Source: {result.get('source', 'api')}",
+        f"  Items fetched: {result.get('total_items', 0)}",
+        f"  Items indexed: {result.get('processed_items', 0)}",
+        f"  Scope: {', '.join(result.get('scope_collections', ['all']))}",
+        f"  Embedding model: {result.get('embedding_model', 'unknown')}",
+    ]
+    return "\n".join(lines)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Codex Research Assist OpenClaw Runner")
-    parser.add_argument("--action", required=True, choices=["digest", "search", "profile-refresh", "render-digest"], help="Action to perform")
+    parser.add_argument("--action", required=True, choices=["digest", "search", "profile-refresh", "render-digest", "sync-index"], help="Action to perform")
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG, help="Path to config.json")
     parser.add_argument("--query", type=str, default="", help="Search query (for search action)")
     parser.add_argument("--digest-json", type=Path, default=None, help="Path to digest manifest JSON (for render-digest action)")
     parser.add_argument("--top", type=int, default=5, help="Number of results (for search action)")
     parser.add_argument("--format", choices=["markdown", "telegram", "delivery"], default="markdown", help="Output format (default: markdown)")
+    parser.add_argument("--force-rebuild", action="store_true", help="Force rebuild semantic index (for sync-index action)")
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable debug logging")
     args = parser.parse_args()
 
@@ -1099,6 +1129,9 @@ def main():
         elif args.action == "profile-refresh":
             config = load_config(args.config)
             output = action_profile_refresh(config)
+        elif args.action == "sync-index":
+            config = load_config(args.config)
+            output = action_sync_index(config, config_path=args.config, force_rebuild=args.force_rebuild)
         else:
             parser.error(f"Unknown action: {args.action}")
         print(output)

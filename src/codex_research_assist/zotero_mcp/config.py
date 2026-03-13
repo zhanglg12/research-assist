@@ -58,6 +58,7 @@ class ZoteroMcpConfig:
     library_type: str
     enforce_library_id: str | None
     enforce_library_type: str | None
+    scope_collection: str
     profile_collections: tuple[str, ...]
     profile_tags: tuple[str, ...]
     feedback_default_collections: tuple[str, ...]
@@ -118,6 +119,7 @@ def load_zotero_config(config_path: str | Path | None = None) -> ZoteroMcpConfig
     ).strip() or "user"
     enforce_library_id = str(zotero_cfg.get("enforce_library_id") or "").strip() or None
     enforce_library_type = str(zotero_cfg.get("enforce_library_type") or "").strip() or None
+    scope_collection = str(zotero_cfg.get("scope_collection") or "").strip()
     semantic_cfg = payload.get("semantic_search") if isinstance(payload.get("semantic_search"), dict) else {}
     semantic_db_path_text = str(
         semantic_cfg.get("zotero_db_path")
@@ -162,6 +164,7 @@ def load_zotero_config(config_path: str | Path | None = None) -> ZoteroMcpConfig
         library_type=library_type,
         enforce_library_id=enforce_library_id,
         enforce_library_type=enforce_library_type,
+        scope_collection=scope_collection,
         profile_collections=tuple(_as_string_list(zotero_cfg.get("profile_collections"))),
         profile_tags=tuple(_as_string_list(zotero_cfg.get("profile_tags"))),
         feedback_default_collections=tuple(_as_string_list(zotero_cfg.get("feedback_default_collections"))),
