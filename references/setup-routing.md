@@ -31,6 +31,37 @@ Once setup is complete:
 
 ---
 
+## Phase 0: Locate skill directory and install/update the repo
+
+Before asking any setup questions, the agent should first ensure the skill is installed in the expected skill root.
+
+Default target:
+
+- skill root: `~/.openclaw/skills/research-assist`
+- config path: `~/.openclaw/skills/research-assist/config.json`
+
+Required behavior:
+
+1. Check whether `~/.openclaw/skills/research-assist` already exists.
+2. If it does not exist, create the parent skill directory and clone the repo into that exact path.
+3. If it exists and is already a git checkout of `research-assist`, use it in place and update it when appropriate.
+4. Only after the skill root exists should the agent inspect or write `config.json`.
+
+Suggested commands:
+
+```bash
+mkdir -p ~/.openclaw/skills
+if [ -d ~/.openclaw/skills/research-assist/.git ]; then
+  cd ~/.openclaw/skills/research-assist && git pull --ff-only
+else
+  git clone https://github.com/zhanglg12/research-assist ~/.openclaw/skills/research-assist
+fi
+cd ~/.openclaw/skills/research-assist
+uv sync
+```
+
+If shell access is available, perform these steps instead of only telling the user what to run.
+
 ## Pre-check: is config.json already valid?
 
 Before asking any setup questions, check if a valid `config.json` already exists at the expected location (`~/.openclaw/skills/research-assist/config.json` or the path the user provided).

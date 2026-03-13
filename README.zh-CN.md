@@ -94,14 +94,16 @@
 
 > **读取 `https://github.com/zhanglg12/research-assist` 的 README，然后按照 `references/setup-routing.md` 为我交互式地配置 research-assist。**
 
-agent 会自动 clone 仓库，根据你实际需要的功能（最小 digest、Zotero 集成、邮件投递等）问你几个有针对性的问题，写好 `config.json`，执行所选后端或投递路线需要的安装命令，并在结束前做最小验证。
+agent 会先定位 skill 目录，把仓库 clone 或更新到 `~/.openclaw/skills/research-assist`，再根据你实际需要的功能（最小 digest、Zotero 集成、邮件投递等）问你几个有针对性的问题，写好 `config.json`，执行所选后端或投递路线需要的安装命令，并在结束前做最小验证。
 
 ### 方式 B — 手动安装
 
 #### 1. 安装
 
 ```bash
-git clone <this-repo> && cd research-assist
+mkdir -p ~/.openclaw/skills
+git clone https://github.com/zhanglg12/research-assist ~/.openclaw/skills/research-assist
+cd ~/.openclaw/skills/research-assist
 uv sync
 ```
 
