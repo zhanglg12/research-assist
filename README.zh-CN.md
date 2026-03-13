@@ -94,9 +94,9 @@
 
 > **读取 `https://github.com/zhanglg12/research-assist` 的 README，然后按照 `references/setup-routing.md` 为我交互式地配置 research-assist。**
 
-agent 会先定位 skill 目录，把仓库 clone 或更新到 `~/.openclaw/skills/research-assist`，再根据你实际需要的功能（最小 digest、Zotero 集成、邮件投递等）问你几个有针对性的问题，写好 `config.json`，执行所选后端或投递路线需要的安装命令，并在结束前做最小验证。
+agent 会先定位自己宿主环境下的 skill 目录（如果宿主工具没有标准 skill 路径，就先向用户确认安装目标），再把仓库 clone 或更新到那个位置；然后根据你实际需要的功能（最小 digest、Zotero 集成、邮件投递等）问你几个有针对性的问题，写好 `config.json`，执行所选后端或投递路线需要的安装命令，并在结束前做最小验证。对 OpenClaw 来说，这个路径通常是 `~/.openclaw/skills/research-assist`。
 
-### 方式 B — 手动安装
+### 方式 B — 手动安装（以下命令以 OpenClaw 为例）
 
 #### 1. 安装
 

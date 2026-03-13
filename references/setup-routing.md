@@ -31,23 +31,30 @@ Once setup is complete:
 
 ---
 
-## Phase 0: Locate skill directory and install/update the repo
+## Phase 0: Locate the host agent's skill directory and install/update the repo
 
-Before asking any setup questions, the agent should first ensure the skill is installed in the expected skill root.
+Before asking any setup questions, the agent should first resolve its own skill root (or the user-requested install location) and ensure `research-assist` is present there.
 
-Default target:
+Resolution rule:
 
-- skill root: `~/.openclaw/skills/research-assist`
-- config path: `~/.openclaw/skills/research-assist/config.json`
+1. Detect the host agent's normal skill/plugin directory if it has one.
+2. If the host agent has no standard skill root, ask the user for the install location or use a clearly named local project directory.
+3. Treat OpenClaw as one example, not the universal default.
+
+Examples:
+
+- OpenClaw skill root: `~/.openclaw/skills/research-assist`
+- Other agents: use that agent's own skill/tool/plugin directory, or a user-provided project path
 
 Required behavior:
 
-1. Check whether `~/.openclaw/skills/research-assist` already exists.
-2. If it does not exist, create the parent skill directory and clone the repo into that exact path.
-3. If it exists and is already a git checkout of `research-assist`, use it in place and update it when appropriate.
-4. Only after the skill root exists should the agent inspect or write `config.json`.
+1. Resolve the install target first.
+2. Check whether the target already exists.
+3. If it does not exist, create the parent directory and clone the repo into that exact path.
+4. If it exists and is already a git checkout of `research-assist`, use it in place and update it when appropriate.
+5. Only after the skill root exists should the agent inspect or write `config.json`.
 
-Suggested commands:
+OpenClaw example commands:
 
 ```bash
 mkdir -p ~/.openclaw/skills
@@ -60,7 +67,7 @@ cd ~/.openclaw/skills/research-assist
 uv sync
 ```
 
-If shell access is available, perform these steps instead of only telling the user what to run.
+If shell access is available, perform the install/update steps for the resolved target instead of only telling the user what to run.
 
 ## Pre-check: is config.json already valid?
 

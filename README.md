@@ -94,9 +94,9 @@ If you already use **Claude Code**, **Codex CLI**, **Gemini CLI**, or any LLM-ba
 
 > **Read the README at `https://github.com/zhanglg12/research-assist` and follow `references/setup-routing.md` to set up research-assist for me interactively.**
 
-The agent will first locate the skill directory, clone or update the repo into `~/.openclaw/skills/research-assist`, ask you a few focused questions based on what you actually need (minimal digest, Zotero integration, email delivery, etc.), write `config.json`, execute the required setup commands for the chosen backend or delivery route, and verify the result before finishing.
+The agent will first locate its own skill directory (or ask for an install target if its host tool has no standard one), clone or update the repo there, ask you a few focused questions based on what you actually need (minimal digest, Zotero integration, email delivery, etc.), write `config.json`, execute the required setup commands for the chosen backend or delivery route, and verify the result before finishing. For OpenClaw, that target is typically `~/.openclaw/skills/research-assist`.
 
-### Option B — Manual install
+### Option B — Manual install (OpenClaw example)
 
 #### 1. Install
 
