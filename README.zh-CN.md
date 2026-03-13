@@ -94,15 +94,21 @@
 
 > **读取 `https://github.com/zhanglg12/research-assist` 的 README，然后按照 `references/setup-routing.md` 为我交互式地配置 research-assist。**
 
-agent 会先定位自己宿主环境下的 skill 目录（如果宿主工具没有标准 skill 路径，就先向用户确认安装目标），再把仓库 clone 或更新到那个位置；然后根据你实际需要的功能（最小 digest、Zotero 集成、邮件投递等）问你几个有针对性的问题，写好 `config.json`，执行所选后端或投递路线需要的安装命令，并在结束前做最小验证。对 OpenClaw 来说，这个路径通常是 `~/.openclaw/skills/research-assist`。
+agent 会先定位自己宿主环境下的 skill 目录（如果宿主工具没有标准 skill 路径，就先向用户确认安装目标），优先复用现有的宿主 skill 根目录，而不是上来就引导用户新建目录；然后再把仓库 clone 或更新到那个位置。之后才根据你实际需要的功能（最小 digest、Zotero 集成、邮件投递等）问你几个有针对性的问题，写好 `config.json`，执行所选后端或投递路线需要的安装命令，并在结束前做最小验证。对 OpenClaw 来说，这个路径通常是 `~/.openclaw/skills/research-assist`。
 
 ### 方式 B — 手动安装（以下命令以 OpenClaw 为例）
 
 #### 1. 安装
 
+如果 `~/.openclaw/skills/research-assist` 已经是你确认好的 skill 目标路径：
+
 ```bash
-mkdir -p ~/.openclaw/skills
-git clone https://github.com/zhanglg12/research-assist ~/.openclaw/skills/research-assist
+if [ -d ~/.openclaw/skills/research-assist/.git ]; then
+  cd ~/.openclaw/skills/research-assist && git pull --ff-only
+else
+  mkdir -p ~/.openclaw/skills
+  git clone https://github.com/zhanglg12/research-assist ~/.openclaw/skills/research-assist
+fi
 cd ~/.openclaw/skills/research-assist
 uv sync
 ```
@@ -112,7 +118,7 @@ uv sync
 #### 2. 配置
 
 ```bash
-# 创建 skill 目录并复制示例配置
+# 在已确认的 skill 根目录内，按需创建运行时子目录
 mkdir -p ~/.openclaw/skills/research-assist/profiles
 mkdir -p ~/.openclaw/skills/research-assist/reports
 cp config.example.json ~/.openclaw/skills/research-assist/config.json

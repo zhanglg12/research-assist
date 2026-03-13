@@ -38,8 +38,9 @@ Before asking any setup questions, the agent should first resolve its own skill 
 Resolution rule:
 
 1. Detect the host agent's normal skill/plugin directory if it has one.
-2. If the host agent has no standard skill root, ask the user for the install location or use a clearly named local project directory.
-3. Treat OpenClaw as one example, not the universal default.
+2. Prefer an existing host-managed skill root; do not lead by telling the user to create a new one.
+3. If the host agent has no standard skill root, ask the user for the install location or use a clearly named local project directory.
+4. Treat OpenClaw as one example, not the universal default.
 
 Examples:
 
@@ -50,17 +51,18 @@ Required behavior:
 
 1. Resolve the install target first.
 2. Check whether the target already exists.
-3. If it does not exist, create the parent directory and clone the repo into that exact path.
-4. If it exists and is already a git checkout of `research-assist`, use it in place and update it when appropriate.
-5. Only after the skill root exists should the agent inspect or write `config.json`.
+3. Prefer reusing an existing skill root when one is available.
+4. Only if the target has been resolved and its parent path is missing should the agent create that parent directory as an implementation detail.
+5. If the target exists and is already a git checkout of `research-assist`, use it in place and update it when appropriate.
+6. Only after the skill root exists should the agent inspect or write `config.json`.
 
-OpenClaw example commands:
+OpenClaw example commands (after resolving that OpenClaw is the host and `~/.openclaw/skills/research-assist` is the correct target):
 
 ```bash
-mkdir -p ~/.openclaw/skills
 if [ -d ~/.openclaw/skills/research-assist/.git ]; then
   cd ~/.openclaw/skills/research-assist && git pull --ff-only
 else
+  mkdir -p ~/.openclaw/skills
   git clone https://github.com/zhanglg12/research-assist ~/.openclaw/skills/research-assist
 fi
 cd ~/.openclaw/skills/research-assist

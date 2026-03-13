@@ -94,15 +94,21 @@ If you already use **Claude Code**, **Codex CLI**, **Gemini CLI**, or any LLM-ba
 
 > **Read the README at `https://github.com/zhanglg12/research-assist` and follow `references/setup-routing.md` to set up research-assist for me interactively.**
 
-The agent will first locate its own skill directory (or ask for an install target if its host tool has no standard one), clone or update the repo there, ask you a few focused questions based on what you actually need (minimal digest, Zotero integration, email delivery, etc.), write `config.json`, execute the required setup commands for the chosen backend or delivery route, and verify the result before finishing. For OpenClaw, that target is typically `~/.openclaw/skills/research-assist`.
+The agent will first locate its own skill directory (or ask for an install target if its host tool has no standard one), prefer an existing host-managed skill root instead of leading with directory creation, then clone or update the repo there, ask you a few focused questions based on what you actually need (minimal digest, Zotero integration, email delivery, etc.), write `config.json`, execute the required setup commands for the chosen backend or delivery route, and verify the result before finishing. For OpenClaw, that target is typically `~/.openclaw/skills/research-assist`.
 
 ### Option B — Manual install (OpenClaw example)
 
 #### 1. Install
 
+If `~/.openclaw/skills/research-assist` is already your intended skill target:
+
 ```bash
-mkdir -p ~/.openclaw/skills
-git clone https://github.com/zhanglg12/research-assist ~/.openclaw/skills/research-assist
+if [ -d ~/.openclaw/skills/research-assist/.git ]; then
+  cd ~/.openclaw/skills/research-assist && git pull --ff-only
+else
+  mkdir -p ~/.openclaw/skills
+  git clone https://github.com/zhanglg12/research-assist ~/.openclaw/skills/research-assist
+fi
 cd ~/.openclaw/skills/research-assist
 uv sync
 ```
@@ -112,7 +118,7 @@ That's it. One command installs the base Python dependencies for the skill.
 #### 2. Set up config
 
 ```bash
-# Create the skill directory and copy the example config
+# Inside the resolved skill root, create runtime subdirectories if missing
 mkdir -p ~/.openclaw/skills/research-assist/profiles
 mkdir -p ~/.openclaw/skills/research-assist/reports
 cp config.example.json ~/.openclaw/skills/research-assist/config.json
