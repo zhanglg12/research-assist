@@ -69,6 +69,7 @@ class ZoteroMcpConfig:
     semantic_collection_name: str
     semantic_embedding_model: str
     semantic_extract_fulltext: bool
+    semantic_embedding_config: dict[str, Any]
     semantic_local_group_id: int | None
     semantic_local_library_id: int | None
 
@@ -144,6 +145,9 @@ def load_zotero_config(config_path: str | Path | None = None) -> ZoteroMcpConfig
     semantic_embedding_model = str(
         semantic_cfg.get("embedding_model") or "default"
     ).strip() or "default"
+    semantic_embedding_config: dict[str, Any] = {}
+    if isinstance(semantic_cfg.get("embedding_config"), dict):
+        semantic_embedding_config = semantic_cfg["embedding_config"]
     semantic_local_group_id = semantic_cfg.get("local_group_id")
     if isinstance(semantic_local_group_id, str) and semantic_local_group_id.strip().isdigit():
         semantic_local_group_id = int(semantic_local_group_id.strip())
@@ -174,6 +178,7 @@ def load_zotero_config(config_path: str | Path | None = None) -> ZoteroMcpConfig
         semantic_persist_directory=semantic_persist_directory,
         semantic_collection_name=semantic_collection_name,
         semantic_embedding_model=semantic_embedding_model,
+        semantic_embedding_config=semantic_embedding_config,
         semantic_extract_fulltext=_as_bool(semantic_cfg.get("extract_fulltext"), False),
         semantic_local_group_id=semantic_local_group_id,
         semantic_local_library_id=semantic_local_library_id,

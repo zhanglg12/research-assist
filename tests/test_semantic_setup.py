@@ -30,6 +30,7 @@ class OllamaEmbeddingBackendTest(unittest.TestCase):
             json={"model": "qwen3-embedding:0.6b", "input": ["title and abstract"]},
             headers={"Content-Type": "application/json", "Authorization": "Bearer ollama"},
             timeout=120,
+            proxies={"http": None, "https": None},
         )
 
     def test_create_chroma_client_uses_ollama_backend_for_qwen(self) -> None:
