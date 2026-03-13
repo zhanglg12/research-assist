@@ -2,7 +2,7 @@
   "profile_path": "~/.openclaw/skills/research-assist/profiles/research-interest.json",
   "output_root": "~/.openclaw/skills/research-assist/reports",
   "review_generation": {
-    "agent_top_n": 5,
+    "agent_top_n": 8,
     "final_top_n": 5,
     "fallback_to_system": true
   },
