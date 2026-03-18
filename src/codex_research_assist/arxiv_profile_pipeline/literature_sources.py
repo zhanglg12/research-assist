@@ -137,10 +137,18 @@ def fetch_items_for_source(
 
 def canonical_paper_key(item: dict[str, Any]) -> str:
     doi = normalize_doi(item.get("doi"))
+    arxiv_id = normalize_arxiv_id(item.get("arxiv_id"))
+
+    # arXiv DOIs (10.48550/arxiv.*) should resolve to the arXiv ID key
+    # so that the same paper from arXiv and Semantic Scholar deduplicates
+    if doi and doi.startswith("10.48550/arxiv."):
+        extracted = normalize_arxiv_id(doi.removeprefix("10.48550/arxiv."))
+        if extracted:
+            return f"arxiv:{extracted}"
+
     if doi:
         return f"doi:{doi}"
 
-    arxiv_id = normalize_arxiv_id(item.get("arxiv_id"))
     if arxiv_id:
         return f"arxiv:{arxiv_id}"
 
@@ -246,6 +254,8 @@ def normalize_arxiv_id(value: object) -> str | None:
     lowered = re.sub(r"^https?://arxiv\.org/(?:abs|pdf)/", "", lowered)
     lowered = re.sub(r"^arxiv:", "", lowered)
     lowered = lowered.removesuffix(".pdf")
+    # Strip version suffix (e.g. "2501.05171v2" → "2501.05171") for stable dedup
+    lowered = re.sub(r"v\d+$", "", lowered)
     return lowered or None
 
 
