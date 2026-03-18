@@ -44,7 +44,7 @@
 | Stage | What happens | Output |
 |---|---|---|
 | **`profile_update`** | Read Zotero evidence (collections, tags, representative papers), maintain a compact research profile | `research-interest.json` |
-| **`retrieval`** | Query arXiv Atom API per interest, deduplicate across interests, write candidate artifacts | Candidate JSON + batch manifest |
+| **`retrieval`** | Query arXiv by default, optionally add OpenAlex and Semantic Scholar, deduplicate before ranking, write candidate artifacts | Candidate JSON + batch manifest |
 | **`zotero_evidence`** | Resolve exact matches and semantic neighbors from the local Zotero index for each candidate | Scored candidates with Zotero anchors |
 | **`agent_patch`** | Host agent fills `recommendation`, `why_it_matters`, `caveats`, `zotero_comparison`, and final keep/drop | Review patches merged into candidates |
 | **`render`** | Generate HTML digest, email body, or Telegram message from the selected subset | `.html` + delivery metadata |
@@ -53,7 +53,7 @@
 ## What it does — in 30 seconds
 
 1. **Reads your Zotero library** — collections, tags, representative papers — and builds a compact research profile
-2. **Searches arXiv against that profile** — not keywords you typed, but evidence from papers you already collected
+2. **Searches arXiv by default, with optional OpenAlex and Semantic Scholar expansion** — not keywords you typed, but evidence from papers you already collected
 3. **Ranks candidates** with a two-signal scorer: research-map fit + Zotero semantic affinity
 4. **Lets the host agent enrich the top picks** — recommendation, why it matters, nearest Zotero anchors, caveats
 5. **Delivers a clean digest** — HTML, email, or Telegram — with only the sharpest papers visible
@@ -134,7 +134,7 @@ Then edit `~/.openclaw/skills/research-assist/config.json` for your setup.
 #### 3. Run
 
 ```bash
-# Full digest: profile check → arXiv retrieval → rank → HTML output
+# Full digest: profile check → literature retrieval → rank → HTML output
 uv run research-assist --action digest --config ~/.openclaw/skills/research-assist/config.json
 
 # Ad-hoc search
@@ -180,7 +180,7 @@ Zotero library
     ↓
 1. profile_update    → Read Zotero evidence, build a compact research map
     ↓
-2. retrieval         → Query arXiv per interest, deduplicate, write candidate JSON
+2. retrieval         → Query arXiv by default, optionally add OpenAlex and Semantic Scholar, deduplicate, write candidate JSON
     ↓
 3. rank              → Two-signal scoring: map_match (0.30) + zotero_semantic (0.70)
     ↓
@@ -258,7 +258,7 @@ config.json
     ↓
 openclaw_runner.py          ← CLI entry point, markdown/HTML to stdout
     ├── profile_refresh_policy  → Should the profile be updated?
-    ├── pipeline.py             → arXiv Atom API retrieval
+    ├── pipeline.py             → multi-source literature retrieval (arXiv default)
     ├── ranker.py               → Two-signal scoring
     ├── review_digest.py        → System-generated review fallback
     ├── review_patch.py         → Agent review patch merge
@@ -266,6 +266,37 @@ openclaw_runner.py          ← CLI entry point, markdown/HTML to stdout
     ├── email_sender.py         → SMTP delivery
     └── telegram_fmt/sender.py  → Telegram delivery
 ```
+
+## Literature sources
+
+`research-assist` defaults to **arXiv only**. You can expand retrieval with any combination of:
+
+- `arxiv`
+- `openalex`
+- `semantic_scholar`
+
+When multiple sources are enabled, retrieval expands the paper pool first and then deduplicates before ranking.
+
+Add this to `config.json`:
+
+```json
+"literature_sources": {
+  "enabled": ["arxiv", "openalex", "semantic_scholar"],
+  "openalex": {
+    "api_key": "",
+    "mailto": ""
+  },
+  "semantic_scholar": {
+    "api_key": ""
+  }
+}
+```
+
+Notes:
+
+- `arxiv` remains the default and requires no extra credentials.
+- `OpenAlex` works anonymously; `mailto` and `api_key` are optional but recommended.
+- `Semantic Scholar` works anonymously; `api_key` is optional and can help with higher rate limits.
 
 ## Agent compatibility
 
@@ -308,3 +339,7 @@ The key design: all intelligence lives in the **host agent**, not inside the pip
 ## Demo data in the visuals
 
 The README visuals use a fictional public-topic profile (Agent memory, Multi-agent planning, World models, RL systems, Tool use, Simulation) with real papers as neutral examples.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).

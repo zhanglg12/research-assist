@@ -64,6 +64,18 @@
       "pdf_max_pages": 10
     }
   },
+  "literature_sources": {
+    "enabled": [
+      "arxiv"
+    ],
+    "openalex": {
+      "api_key": "",
+      "mailto": ""
+    },
+    "semantic_scholar": {
+      "api_key": ""
+    }
+  },
   "retrieval_defaults": {
     "max_results_per_interest": 20,
     "since_days": 7,

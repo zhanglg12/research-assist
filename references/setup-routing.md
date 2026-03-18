@@ -115,7 +115,40 @@ Wait for the user's answer before continuing.
 **If A:** set `semantic_search.enabled = false`, skip Phase 2 and Phase 5. Go to Step 1.2.
 **If B:** go to Step 1.2.
 
-### Step 1.2: Add-ons
+### Step 1.2: Literature sources
+
+Ask the user:
+
+> **Which literature sources should retrieval use?**
+>
+> | | Source | Default | What it adds | Credentials |
+> |---|---|---|---|---|
+> | **1** | **arXiv** | Yes | Fast preprint-first retrieval | None |
+> | **2** | **OpenAlex** | Optional | Broader metadata and DOI-heavy coverage | `mailto` and `api_key` optional |
+> | **3** | **Semantic Scholar** | Optional | Extra candidate recall and metadata | `api_key` optional |
+>
+> Default to **arXiv only** unless the user explicitly asks for broader recall.
+> Multiple sources are allowed. If more than one source is enabled, explain that retrieval will expand the paper pool first and deduplicate before ranking.
+
+Then write:
+
+- `literature_sources.enabled = ["arxiv"]` by default
+- append `openalex` and/or `semantic_scholar` only when selected
+
+If **OpenAlex** is selected, ask:
+
+> **Optional OpenAlex settings**
+>
+> 1. Contact email for `literature_sources.openalex.mailto`? (recommended)
+> 2. OpenAlex API key for `literature_sources.openalex.api_key`? (optional)
+
+If **Semantic Scholar** is selected, ask:
+
+> **Optional Semantic Scholar API key**
+>
+> Store it in `literature_sources.semantic_scholar.api_key`, or leave blank for anonymous access.
+
+### Step 1.3: Add-ons
 
 Ask the user:
 
@@ -435,6 +468,9 @@ Do not turn the completion summary into another setup round. Once config is writ
     "persist_directory": "~/.openclaw/skills/research-assist/.semantic-search",
     "collection_name": "research_assist_zotero",
     "embedding_model": "qwen",
+    "embedding_config": {
+      "base_url": "http://localhost:11434/v1"
+    },
     "local_group_id": null,
     "local_library_id": null,
     "extract_fulltext": false,
@@ -446,6 +482,16 @@ Do not turn the completion summary into another setup round. Once config is writ
     },
     "extraction": {
       "pdf_max_pages": 10
+    }
+  },
+  "literature_sources": {
+    "enabled": ["arxiv"],
+    "openalex": {
+      "api_key": "",
+      "mailto": ""
+    },
+    "semantic_scholar": {
+      "api_key": ""
     }
   },
   "retrieval_defaults": {
@@ -461,6 +507,12 @@ Do not turn the completion summary into another setup round. Once config is writ
 | User choice | Field(s) to change | Value |
 |---|---|---|
 | Quick try (no Zotero) | `semantic_search.enabled` | `false` |
+| Retrieval source: arXiv only | `literature_sources.enabled` | `["arxiv"]` |
+| Retrieval source: add OpenAlex | `literature_sources.enabled` | append `"openalex"` |
+| Retrieval source: add Semantic Scholar | `literature_sources.enabled` | append `"semantic_scholar"` |
+| OpenAlex contact email | `literature_sources.openalex.mailto` | user-provided or empty |
+| OpenAlex API key | `literature_sources.openalex.api_key` | user-provided or empty |
+| Semantic Scholar API key | `literature_sources.semantic_scholar.api_key` | user-provided or empty |
 | Zotero personal library | `zotero.library_type` | `"user"` |
 | Zotero group library | `zotero.library_type` | `"group"` |
 | Library ID | `zotero.library_id` | user-provided string |

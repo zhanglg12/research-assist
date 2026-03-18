@@ -18,16 +18,21 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .arxiv_profile_pipeline.client import fetch_arxiv_feed
-from .arxiv_profile_pipeline.parser import parse_feed
+from .arxiv_profile_pipeline.literature_sources import (
+    build_free_text_query,
+    canonical_paper_key,
+    display_identifier,
+    fetch_items_for_source,
+    get_enabled_sources,
+    source_label,
+)
 from .arxiv_profile_pipeline.pipeline import run_pipeline
-from .arxiv_profile_pipeline.query import build_search_query
 from .controller.profile_refresh_policy import evaluate_profile_refresh_policy
 from .digest_summary import write_digest_run_summary
 from .email_sender import send_email
+from .html_fmt import format_digest_html, format_search_html
 from .ranker import rank_candidates
 from .review_digest import enrich_candidates_with_system_review
-from .html_fmt import format_digest_html, format_search_html
 from .telegram_fmt import format_digest_telegram, format_search_telegram
 from .telegram_sender import send_digest
 from .zotero_mcp.semantic_search import create_semantic_search
@@ -545,7 +550,7 @@ def create_temp_toml_config(config: dict, profile_path: Path, output_root: Path)
     retrieval_defaults = config.get("retrieval_defaults", {})
     max_age_days = retrieval_defaults.get("max_age_days", 7)
 
-    toml_text = "\n".join([
+    toml_lines = [
         f"profile_path = {_toml_quote(profile_path.as_posix())}",
         f"output_root = {_toml_quote(output_root.as_posix())}",
         "",
@@ -560,7 +565,26 @@ def create_temp_toml_config(config: dict, profile_path: Path, output_root: Path)
         f"max_age_days = {int(max_age_days)}",
         "refresh_if_missing = true",
         "",
-    ])
+    ]
+
+    # Forward literature_sources so non-CLI callers get multi-source behaviour
+    lit_sources = config.get("literature_sources")
+    if isinstance(lit_sources, dict):
+        enabled = lit_sources.get("enabled", ["arxiv"])
+        if isinstance(enabled, list):
+            enabled_str = ", ".join(_toml_quote(str(s)) for s in enabled)
+            toml_lines.append("[literature_sources]")
+            toml_lines.append(f"enabled = [{enabled_str}]")
+            toml_lines.append("")
+            for provider in ("openalex", "semantic_scholar"):
+                pcfg = lit_sources.get(provider)
+                if isinstance(pcfg, dict):
+                    toml_lines.append(f"[literature_sources.{provider}]")
+                    for k, v in pcfg.items():
+                        toml_lines.append(f"{k} = {_toml_quote(str(v or ''))}")
+                    toml_lines.append("")
+
+    toml_text = "\n".join(toml_lines)
 
     temp_file = tempfile.NamedTemporaryFile(mode="w", suffix=".toml", encoding="utf-8", delete=False)
     temp_file.write(toml_text)
@@ -774,7 +798,7 @@ def _render_digest_outputs(
 
 def format_digest_markdown(digest_json_path: Path, candidates: list[dict]) -> str:
     date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    lines = [f"# arXiv Research Digest {date_str}", ""]
+    lines = [f"# Research Digest {date_str}", ""]
 
     if not candidates:
         lines.append("No new papers found matching your research interests.")
@@ -789,7 +813,8 @@ def format_digest_markdown(digest_json_path: Path, candidates: list[dict]) -> st
         review = candidate.get("review", {})
         title = paper.get("title", "Untitled")
         authors = paper.get("authors", [])
-        arxiv_id = paper.get("identifiers", {}).get("arxiv_id", "")
+        provider = source_label(candidate.get("source", {}).get("provider"))
+        display_id = paper.get("identifiers", {}).get("display", "")
         url = paper.get("identifiers", {}).get("url", "")
         abstract = paper.get("abstract", "")
         matched_interests = triage.get("matched_interest_labels", [])
@@ -801,8 +826,9 @@ def format_digest_markdown(digest_json_path: Path, candidates: list[dict]) -> st
         lines.append(f"## {i}. {title}")
         if author_str:
             lines.append(f"**Authors:** {author_str}")
-        if arxiv_id:
-            lines.append(f"**arXiv ID:** {arxiv_id}")
+        lines.append(f"**Source:** {provider}")
+        if display_id:
+            lines.append(f"**Identifier:** {display_id}")
         if url:
             lines.append(f"**URL:** {url}")
         if matched_interests:
@@ -824,7 +850,7 @@ def format_digest_markdown(digest_json_path: Path, candidates: list[dict]) -> st
         lines.extend(_nearest_zotero_lines(candidate))
         if abstract:
             abstract_preview = abstract[:300] + ("..." if len(abstract) > 300 else "")
-            lines.append(f"\n**Original arXiv Abstract:** {abstract_preview}")
+            lines.append(f"\n**Original Abstract:** {abstract_preview}")
         lines.append("")
 
     lines.append("---")
@@ -833,7 +859,7 @@ def format_digest_markdown(digest_json_path: Path, candidates: list[dict]) -> st
 
 
 def format_search_markdown(papers: list[dict], query: str) -> str:
-    lines = [f"# arXiv Search: \"{query}\"", ""]
+    lines = [f"# Literature Search: \"{query}\"", ""]
 
     if not papers:
         lines.append("No results found.")
@@ -845,7 +871,8 @@ def format_search_markdown(papers: list[dict], query: str) -> str:
     for i, paper in enumerate(papers, 1):
         title = paper.get("title", "Untitled")
         authors = paper.get("authors", [])
-        arxiv_id = paper.get("arxiv_id", "")
+        provider = source_label(paper.get("provider"))
+        display_id = paper.get("paper_id_display") or display_identifier(paper)
         url = paper.get("html_url", "")
         abstract = paper.get("summary", "")
 
@@ -856,13 +883,14 @@ def format_search_markdown(papers: list[dict], query: str) -> str:
         lines.append(f"## {i}. {title}")
         if author_str:
             lines.append(f"**Authors:** {author_str}")
-        if arxiv_id:
-            lines.append(f"**arXiv ID:** {arxiv_id}")
+        lines.append(f"**Source:** {provider}")
+        if display_id:
+            lines.append(f"**Identifier:** {display_id}")
         if url:
             lines.append(f"**URL:** {url}")
         if abstract:
             abstract_preview = abstract[:250] + ("..." if len(abstract) > 250 else "")
-            lines.append(f"\n**Original arXiv Abstract:** {abstract_preview}")
+            lines.append(f"\n**Original Abstract:** {abstract_preview}")
         lines.append("")
 
     return "\n".join(lines)
@@ -910,8 +938,9 @@ def action_digest(config: dict, fmt: str = "markdown", *, config_path: Path | No
             LOG.warning("Profile refresh required: %s", reason)
             LOG.warning("Proceeding with retrieval using existing profile (if available)")
 
-        LOG.info("Running arXiv retrieval pipeline...")
-        result = run_pipeline(config_path=temp_toml_path, profile_path=profile_path, write_candidate_markdown_override=False)
+        LOG.info("Running literature retrieval pipeline...")
+        pipeline_config_path = config_path or temp_toml_path
+        result = run_pipeline(config_path=pipeline_config_path, profile_path=profile_path, write_candidate_markdown_override=False)
         digest_json_path = Path(result["digest_json_path"])
         candidate_count = result["candidate_count"]
         LOG.info("Retrieved %d candidates", candidate_count)
@@ -981,10 +1010,33 @@ def action_digest(config: dict, fmt: str = "markdown", *, config_path: Path | No
 
 
 def action_search(query: str, top: int = 5, fmt: str = "markdown", config: dict | None = None) -> str:
-    LOG.info("Searching arXiv for: %s", query)
-    search_query = build_search_query(categories=[], keywords=[query], exclude_keywords=None, logic="OR")
-    xml_text = fetch_arxiv_feed(search_query, start=0, max_results=top, sort_by="relevance", sort_order="descending")
-    papers = parse_feed(xml_text)
+    config = config or {}
+    enabled_sources = get_enabled_sources(config)
+    LOG.info("Searching literature for %s via %s", query, ", ".join(enabled_sources))
+    unique_papers: dict[str, dict] = {}
+    for source in enabled_sources:
+        provider_query = build_free_text_query(source, query)
+        try:
+            papers = fetch_items_for_source(
+                source,
+                provider_query,
+                max_results=top,
+                page_size=max(10, top),
+                since_days=0,
+                sort_by="relevance",
+                sort_order="descending",
+                config=config,
+            )
+        except Exception as exc:
+            LOG.warning("Search source %s unavailable: %s", source, exc)
+            continue
+        for paper in papers:
+            item_key = canonical_paper_key(paper)
+            if item_key in unique_papers:
+                continue
+            paper["paper_id_display"] = display_identifier(paper)
+            unique_papers[item_key] = paper
+    papers = list(unique_papers.values())
     LOG.info("Found %d results", len(papers))
 
     papers_subset = papers[:top]
@@ -1019,8 +1071,10 @@ def action_search(query: str, top: int = 5, fmt: str = "markdown", config: dict 
         lines = [f"Found {len(papers_subset)} results for \"{query}\":"]
         for i, paper in enumerate(papers_subset, 1):
             title = paper.get("title", "Untitled")
-            arxiv_id = paper.get("arxiv_id", "")
-            lines.append(f"{i}. {title[:60]}... ({arxiv_id})")
+            display_id = paper.get("paper_id_display") or display_identifier(paper)
+            provider = source_label(paper.get("provider"))
+            suffix = f"{provider} | {display_id}" if display_id else provider
+            lines.append(f"{i}. {title[:60]}... ({suffix})")
         file_names = [html_path.name]
         if email_json_path is not None:
             file_names.append(email_json_path.name)

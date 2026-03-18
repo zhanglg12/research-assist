@@ -4,14 +4,19 @@ import argparse
 import json
 import re
 import tomllib
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 
-from .client import fetch_arxiv_feed
-from .parser import parse_feed
+from .literature_sources import (
+    build_interest_queries,
+    canonical_paper_key,
+    display_identifier,
+    fetch_items_for_source,
+    get_enabled_sources,
+    merge_source_items,
+)
 from .profile_contract import normalize_profile_payload
-from .query import build_search_query
 
 
 def _load_toml(path: Path) -> dict[str, object]:
@@ -22,6 +27,12 @@ def _load_toml(path: Path) -> dict[str, object]:
 def _load_json(path: Path) -> dict[str, object]:
     with path.open("r", encoding="utf-8") as file_handle:
         return json.load(file_handle)
+
+
+def _load_config(path: Path) -> dict[str, object]:
+    if path.suffix.lower() == ".json":
+        return _load_json(path)
+    return _load_toml(path)
 
 
 def _slugify(value: str) -> str:
@@ -50,6 +61,11 @@ def _parse_timestamp(value: str | None) -> datetime | None:
 
 
 def _extract_year(item: dict[str, object]) -> int | None:
+    year_value = item.get("year")
+    if isinstance(year_value, int):
+        return year_value
+    if isinstance(year_value, str) and year_value.isdigit():
+        return int(year_value)
     for field_name in ("updated", "published"):
         timestamp = _parse_timestamp(item.get(field_name))
         if timestamp is not None:
@@ -69,12 +85,15 @@ def _load_seen_ids(path: Path) -> set[str]:
     except Exception:
         return set()
     if isinstance(data, dict) and "ids" in data and isinstance(data["ids"], list):
-        return {value for value in data["ids"] if isinstance(value, str)}
-    if isinstance(data, list):
-        return {value for value in data if isinstance(value, str)}
-    if isinstance(data, dict):
-        return {key for key in data.keys() if isinstance(key, str)}
-    return set()
+        raw = {value for value in data["ids"] if isinstance(value, str)}
+    elif isinstance(data, list):
+        raw = {value for value in data if isinstance(value, str)}
+    elif isinstance(data, dict):
+        raw = {key for key in data.keys() if isinstance(key, str)}
+    else:
+        return set()
+    # Migrate old-format bare arXiv IDs (e.g. "2501.12345") to canonical prefix form
+    return {f"arxiv:{v}" if ":" not in v else v for v in raw}
 
 
 def _write_seen_ids(path: Path, seen_ids: set[str]) -> None:
@@ -102,6 +121,7 @@ def _render_candidate_markdown(candidate: dict[str, object]) -> str:
             "## Source Trace",
             f"- Source Kind: {source['kind']}",
             f"- Provider: {source.get('provider') or ''}",
+            f"- Providers: {', '.join(source.get('providers') or [])}",
             f"- Collected At: {source['collected_at']}",
             f"- Retrieval Profile ID: {source.get('retrieval_profile_id') or ''}",
             f"- Retrieval Profile Path: {source.get('retrieval_profile_path') or ''}",
@@ -109,6 +129,7 @@ def _render_candidate_markdown(candidate: dict[str, object]) -> str:
             f"- Query Text: {source.get('query_text') or ''}",
             f"- Source Item ID: {source.get('source_item_id') or ''}",
             f"- Source URI: {source.get('source_uri') or ''}",
+            f"- Display ID: {paper['identifiers'].get('display') or ''}",
             f"- Raw Text Digest: {source.get('raw_text_digest') or ''}",
             "",
             "## Paper Metadata",
@@ -123,6 +144,8 @@ def _render_candidate_markdown(candidate: dict[str, object]) -> str:
             f"- Journal Ref: {paper.get('journal_ref') or ''}",
             f"- DOI: {paper['identifiers'].get('doi') or ''}",
             f"- arXiv ID: {paper['identifiers'].get('arxiv_id') or ''}",
+            f"- OpenAlex ID: {paper['identifiers'].get('openalex_id') or ''}",
+            f"- Semantic Scholar ID: {paper['identifiers'].get('semantic_scholar_id') or ''}",
             f"- Primary URL: {paper['identifiers'].get('url') or ''}",
             f"- PDF URL: {paper.get('pdf_url') or ''}",
             f"- Additional Source Links: {', '.join(paper.get('source_links') or [])}",
@@ -184,8 +207,9 @@ def _build_candidate(
             "batch_id": batch_id,
         },
         "source": {
-            "kind": "arxiv_query",
-            "provider": "arxiv",
+            "kind": "literature_query",
+            "provider": item.get("provider") or "arxiv",
+            "providers": item.get("source_providers") or [item.get("provider") or "arxiv"],
             "collected_at": generated_at,
             "retrieval_profile_id": item.get("profile_id"),
             "retrieval_profile_path": profile_path.as_posix(),
@@ -193,6 +217,7 @@ def _build_candidate(
             "query_text": query_text,
             "source_item_id": item.get("id"),
             "source_uri": item.get("html_url") or item.get("id"),
+            "merged_records": item.get("source_records") or [],
             "subject": None,
             "sender": None,
             "received_at": None,
@@ -213,19 +238,22 @@ def _build_candidate(
             "comments": item.get("comments"),
             "journal_ref": item.get("journal_ref"),
             "identifiers": {
-                "doi": None,
+                "doi": item.get("doi"),
                 "arxiv_id": item.get("arxiv_id"),
+                "openalex_id": item.get("openalex_id"),
+                "semantic_scholar_id": item.get("semantic_scholar_id"),
+                "display": display_identifier(item),
                 "url": item.get("html_url") or item.get("id"),
             },
-            "source_links": source_links,
+            "source_links": list(dict.fromkeys(source_links + list(item.get("source_links") or []))),
             "abstract": item.get("summary"),
-            "abstract_source": "arxiv_atom",
+            "abstract_source": item.get("abstract_source") or "unknown",
             "pdf_url": item.get("pdf_url"),
         },
         "triage": {
             "extraction_confidence": "high" if item.get("summary") and item.get("title") else "medium",
             "abstract_status": "found" if item.get("summary") else "missing",
-            "duplicate_hint": "none",
+            "duplicate_hint": "merged_across_sources" if len(item.get("source_providers") or []) > 1 else "none",
             "next_action": "send_to_reviewer",
             "limitations": [],
             "notes": [],
@@ -254,51 +282,50 @@ def _collect_items_for_interest(
     interest: dict[str, object],
     defaults: dict[str, object],
     seen_ids: set[str],
-) -> tuple[list[dict[str, object]], str]:
-    logic = str(interest.get("logic") or defaults.get("logic") or "AND")
-    categories = list(interest.get("categories") or defaults.get("categories") or [])
-    method_keywords = list(interest.get("method_keywords") or interest.get("keywords") or [])
-    query_aliases = list(interest.get("query_aliases") or [])
-    keywords = list(dict.fromkeys([*method_keywords, *query_aliases]))[:3]
-    exclude_keywords = list(interest.get("exclude_keywords") or defaults.get("exclude_keywords") or [])
+    config: dict[str, object] | None = None,
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     sort_by = str(defaults.get("sort_by") or "lastUpdatedDate")
     sort_order = str(defaults.get("sort_order") or "descending")
     max_results = int(interest.get("max_results") or defaults.get("max_results_per_interest") or 20)
     since_days = int(interest.get("since_days") or defaults.get("since_days") or 7)
     page_size = min(200, max(25, max_results))
-    max_pages = int(defaults.get("max_pages") or 10)
-    cutoff = datetime.now(UTC) - timedelta(days=since_days) if since_days > 0 else None
-    query_text = build_search_query(categories, keywords, exclude_keywords, logic)
-
     collected: list[dict[str, object]] = []
-    reached_cutoff = False
-    start = 0
-    for _ in range(max_pages):
-        xml_text = fetch_arxiv_feed(
-            query_text,
-            start=start,
-            max_results=page_size,
-            sort_by=sort_by,
-            sort_order=sort_order,
+    query_manifest: list[dict[str, object]] = []
+    queries = build_interest_queries(interest, defaults)
+    enabled_sources = get_enabled_sources(config)
+
+    for source in enabled_sources:
+        provider_query = queries.get(source, "")
+        error_message = None
+        try:
+            items = fetch_items_for_source(
+                source,
+                provider_query,
+                max_results=max_results,
+                page_size=page_size,
+                since_days=since_days,
+                sort_by=sort_by,
+                sort_order=sort_order,
+                config=config,
+            )
+        except Exception as exc:
+            items = []
+            error_message = str(exc)
+        query_manifest.append(
+            {
+                "provider": source,
+                "provider_label": source.replace("_", " ").title(),
+                "query_text": provider_query,
+                "fetched_items": len(items),
+                "error": error_message,
+            }
         )
-        page_items = parse_feed(xml_text)
-        if not page_items:
-            break
-        for item in page_items:
-            arxiv_item_id = str(item.get("arxiv_id") or item.get("id") or "")
-            item_timestamp = _parse_timestamp(item.get("updated")) or _parse_timestamp(item.get("published"))
-            if cutoff and item_timestamp and item_timestamp < cutoff:
-                reached_cutoff = True
-                break
-            if arxiv_item_id and arxiv_item_id in seen_ids:
+        for item in items:
+            item_key = canonical_paper_key(item)
+            if item_key in seen_ids:
                 continue
             collected.append(item)
-            if len(collected) >= max_results:
-                break
-        if len(collected) >= max_results or reached_cutoff or len(page_items) < page_size:
-            break
-        start += page_size
-    return collected, query_text
+    return collected, query_manifest
 
 
 def run_pipeline(
@@ -307,7 +334,7 @@ def run_pipeline(
     profile_path: Path | None = None,
     write_candidate_markdown_override: bool | None = None,
 ) -> dict[str, object]:
-    config = _load_toml(config_path)
+    config = _load_config(config_path)
     resolved_profile_path = profile_path or Path(str(config["profile_path"]))
     profile = normalize_profile_payload(_load_json(resolved_profile_path))
     defaults = dict(profile.get("retrieval_defaults") or {})
@@ -335,23 +362,28 @@ def run_pipeline(
     for interest in profile.get("interests") or []:
         if not interest.get("enabled", True):
             continue
-        items, query_text = _collect_items_for_interest(
+        items, provider_queries = _collect_items_for_interest(
             interest=interest,
             defaults=defaults,
             seen_ids=seen_ids,
+            config=config,
         )
         interest_id = str(interest.get("interest_id") or interest.get("id") or interest.get("label") or "interest")
         interest_label = str(interest.get("label") or interest_id)
-        query_manifest.append(
-            {
-                "interest_id": interest_id,
-                "label": interest_label,
-                "query_text": query_text,
-                "fetched_items": len(items),
-            }
-        )
+        for provider_query in provider_queries:
+            query_manifest.append(
+                {
+                    "interest_id": interest_id,
+                    "label": interest_label,
+                    "provider": provider_query["provider"],
+                    "provider_label": provider_query["provider_label"],
+                    "query_text": provider_query["query_text"],
+                    "fetched_items": provider_query["fetched_items"],
+                    "error": provider_query.get("error"),
+                }
+            )
         for item in items:
-            item_key = str(item.get("arxiv_id") or item.get("id") or item.get("title") or "")
+            item_key = canonical_paper_key(item)
             if not item_key:
                 continue
             existing = unique_items.get(item_key)
@@ -361,6 +393,7 @@ def run_pipeline(
                 item["matched_interest_labels"] = [interest_label]
                 unique_items[item_key] = item
             else:
+                existing = merge_source_items(existing, item)
                 existing_ids = list(existing.get("matched_interest_ids") or [])
                 existing_labels = list(existing.get("matched_interest_labels") or [])
                 if interest_id not in existing_ids:
@@ -369,9 +402,10 @@ def run_pipeline(
                     existing_labels.append(interest_label)
                 existing["matched_interest_ids"] = existing_ids
                 existing["matched_interest_labels"] = existing_labels
+                unique_items[item_key] = existing
 
     candidates: list[dict[str, object]] = []
-    for item in unique_items.values():
+    for item_key, item in unique_items.items():
         candidate = _build_candidate(
             item=item,
             batch_id=batch_id,
@@ -380,21 +414,19 @@ def run_pipeline(
             profile_path=resolved_profile_path,
             query_label=", ".join(item.get("matched_interest_labels") or []),
             query_text=" | ".join(
-                query["query_text"]
+                f"{query.get('provider_label')}: {query['query_text']}"
                 for query in query_manifest
                 if query["interest_id"] in set(item.get("matched_interest_ids") or [])
             ),
             write_markdown=write_candidate_markdown,
         )
         candidates.append(candidate)
-        item_id = str(item.get("arxiv_id") or item.get("id") or "")
-        if item_id:
-            seen_ids.add(item_id)
+        seen_ids.add(item_key)
 
     digest_markdown_path = digest_root / f"{batch_id}.md"
     digest_json_path = digest_root / f"{batch_id}.json"
     digest_markdown = [
-        "# arXiv Retrieval Digest",
+        "# Literature Retrieval Digest",
         "",
         "## Run Metadata",
         f"- Run ID: {batch_id}",
@@ -409,6 +441,7 @@ def run_pipeline(
         digest_markdown.extend(
             [
                 f"- `{query['label']}`",
+                f"  - Provider: `{query.get('provider_label') or query.get('provider') or ''}`",
                 f"  - Interest ID: `{query['interest_id']}`",
                 f"  - Query: `{query['query_text']}`",
                 f"  - Retrieved: `{query['fetched_items']}`",
@@ -422,7 +455,8 @@ def run_pipeline(
             [
                 f"### {paper['title']}",
                 f"- Authors: {', '.join(paper['authors'])}",
-                f"- arXiv ID: {paper['identifiers'].get('arxiv_id') or ''}",
+                f"- Provider: {candidate.get('source', {}).get('provider') or ''}",
+                f"- Identifier: {paper['identifiers'].get('display') or ''}",
                 f"- URL: {paper['identifiers'].get('url') or ''}",
                 f"- Matched Interests: {', '.join(triage.get('matched_interest_labels') or [])}",
                 f"- Candidate JSON: {candidate['candidate']['json_path']}",
@@ -463,7 +497,7 @@ def run_pipeline(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run the research-assist arXiv profile pipeline")
+    parser = argparse.ArgumentParser(description="Run the research-assist literature retrieval pipeline")
     parser.add_argument("--config", required=True, help="Path to the pipeline TOML config")
     parser.add_argument("--profile", default=None, help="Override the research-interest profile JSON path")
     parser.add_argument("--with-candidate-markdown", action="store_true", help="Force candidate Markdown debug artifacts on")

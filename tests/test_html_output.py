@@ -86,7 +86,7 @@ class DigestHtmlStructureTest(unittest.TestCase):
 
     def test_abstract_in_details_block(self) -> None:
         html = format_digest_html([_digest_candidate(abstract="Detailed abstract content here.")], "2026-03-13")
-        self.assertIn("Original arXiv abstract", html)
+        self.assertIn("Original abstract", html)
         self.assertIn("Detailed abstract content here.", html)
 
     def test_empty_candidates_renders(self) -> None:
@@ -115,7 +115,15 @@ class DigestHtmlStructureTest(unittest.TestCase):
 class SearchHtmlTest(unittest.TestCase):
     def test_search_html_renders(self) -> None:
         papers = [
-            {"title": "Search Hit", "authors": ["Eve"], "summary": "Some summary.", "html_url": "https://arxiv.org/abs/1234", "arxiv_id": "1234"},
+            {
+                "title": "Search Hit",
+                "authors": ["Eve"],
+                "summary": "Some summary.",
+                "html_url": "https://arxiv.org/abs/1234",
+                "arxiv_id": "1234",
+                "provider": "arxiv",
+                "paper_id_display": "arXiv 1234",
+            },
         ]
         html = format_search_html(papers, "test query")
         self.assertIn("<!DOCTYPE html>", html)

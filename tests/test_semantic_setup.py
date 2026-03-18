@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+from codex_research_assist.arxiv_profile_pipeline.pipeline import _collect_items_for_interest
 from codex_research_assist.openclaw_runner import action_digest
 from codex_research_assist.zotero_mcp.chroma_client import OllamaEmbeddingFunction, create_chroma_client
 
@@ -98,6 +99,37 @@ class SemanticToggleTest(unittest.TestCase):
                 result = action_digest(config, config_path=config_path)
 
         self.assertEqual(result, "ok")
+
+
+class InterestQueryAssemblyTest(unittest.TestCase):
+    def test_interest_query_uses_up_to_four_keywords(self) -> None:
+        interest = {
+            "interest_id": "bilevel-pinn",
+            "label": "Bilevel + PINN",
+            "enabled": True,
+            "categories": ["cs.LG", "math.NA"],
+            "method_keywords": ["Bilevel", "PINN"],
+            "query_aliases": ["bilevel optimization", "physics-informed neural network"],
+            "exclude_keywords": [],
+            "logic": "AND",
+        }
+        defaults = {
+            "logic": "AND",
+            "sort_by": "lastUpdatedDate",
+            "sort_order": "descending",
+            "max_results_per_interest": 10,
+            "since_days": 7,
+            "max_pages": 1,
+        }
+
+        with patch("codex_research_assist.arxiv_profile_pipeline.pipeline.fetch_items_for_source", return_value=[]):
+            _, query_manifest = _collect_items_for_interest(interest=interest, defaults=defaults, seen_ids=set())
+
+        arxiv_query = query_manifest[0]["query_text"]
+        self.assertIn('ti:Bilevel', arxiv_query)
+        self.assertIn('ti:PINN', arxiv_query)
+        self.assertIn('ti:"bilevel optimization"', arxiv_query)
+        self.assertIn('ti:"physics-informed neural network"', arxiv_query)
 
 
 if __name__ == "__main__":

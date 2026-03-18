@@ -944,7 +944,13 @@ def format_digest_html(candidates: list[dict], date_str: str) -> str:
         author_line = html.escape(authors[0] + " et al." if len(authors) > 2 else ", ".join(authors[:2]))
         abstract_text = paper.get("abstract", "")
         abstract = html.escape(abstract_text)
-        arxiv_id = paper.get("identifiers", {}).get("arxiv_id", "")
+        provider = str((candidate.get("source") or {}).get("provider") or "arxiv")
+        provider_label = {
+            "arxiv": "arXiv",
+            "openalex": "OpenAlex",
+            "semantic_scholar": "Semantic Scholar",
+        }.get(provider, provider)
+        display_id = paper.get("identifiers", {}).get("display") or paper.get("identifiers", {}).get("arxiv_id") or ""
         url = html.escape(paper.get("identifiers", {}).get("url", ""))
 
         total = scores.get("total", 0)
@@ -988,7 +994,7 @@ def format_digest_html(candidates: list[dict], date_str: str) -> str:
                     <h2><a href="{url}" target="_blank">{title}</a></h2>
                     <div class="paper-meta">
                         <span class="meta-item">{author_line}</span>
-                        <span class="meta-item"><span class="meta-dot"></span>arXiv: {html.escape(arxiv_id)}</span>
+                        <span class="meta-item"><span class="meta-dot"></span>{html.escape(provider_label)}{(": " + html.escape(display_id)) if display_id else ""}</span>
                     </div>
                     <div class="tags">{tags_html}</div>
                     <p class="lede">{lede}</p>
@@ -1018,7 +1024,7 @@ def format_digest_html(candidates: list[dict], date_str: str) -> str:
                         </div>
                     </div>
                     <details>
-                        <summary>Original arXiv abstract</summary>
+                        <summary>Original abstract</summary>
                         <p class="abstract">{abstract}</p>
                     </details>
                 </div>
@@ -1093,7 +1099,13 @@ def format_search_html(papers: list[dict], query: str) -> str:
         summary = html.escape(summary_text)
         summary_preview = html.escape(_truncate(summary_text, 170))
         url = html.escape(paper.get("html_url", ""))
-        arxiv_id = html.escape(paper.get("arxiv_id", ""))
+        provider = str(paper.get("provider") or "arxiv")
+        provider_label = {
+            "arxiv": "arXiv",
+            "openalex": "OpenAlex",
+            "semantic_scholar": "Semantic Scholar",
+        }.get(provider, provider)
+        display_id = html.escape(str(paper.get("paper_id_display") or paper.get("arxiv_id") or ""))
         feature_class = " featured" if idx == 1 else ""
 
         card = f"""
@@ -1110,11 +1122,11 @@ def format_search_html(papers: list[dict], query: str) -> str:
                     <h2><a href="{url}" target="_blank">{title}</a></h2>
                     <div class="paper-meta">
                         <span class="meta-item">{author_line}</span>
-                        <span class="meta-item"><span class="meta-dot"></span>arXiv: {arxiv_id}</span>
+                        <span class="meta-item"><span class="meta-dot"></span>{html.escape(provider_label)}{(": " + display_id) if display_id else ""}</span>
                     </div>
                     <p class="lede">{summary_preview}</p>
                     <details>
-                        <summary>Original arXiv abstract</summary>
+                        <summary>Original abstract</summary>
                         <p class="abstract">{summary}</p>
                     </details>
                 </div>

@@ -34,6 +34,8 @@ Rules:
 A good profile should feel like a compact research atlas:
 
 - a few clear regions
+- target about 6 regions by default
+- keep the usual range around 4-8 regions unless the evidence is unusually sparse or unusually fragmented
 - each region centered on a stable method axis
 - short labels
 - retrieval-friendly aliases
@@ -58,6 +60,10 @@ When many papers cluster together, compress them into one method-oriented slice.
 
 When one collection mixes several distinct methods, split them into multiple slices.
 
+If the draft profile has fewer than about 4 regions, it is usually over-compressed.
+
+If the draft profile has more than about 8 regions, it is usually too fragmented for a digest-oriented research map.
+
 Do not preserve the folder tree literally in the final profile.
 Preserve the map structure, not the raw directory listing.
 
@@ -69,5 +75,6 @@ Before writing the final profile, ask:
 2. Which representative papers prove that this region is real?
 3. What neighboring regions are revealed by semantic search?
 4. What short label and aliases would retrieve this region on arXiv without spilling too far?
+5. Does the full profile land near the default target of about 6 regions? If not, should it be compressed or split?
 
 The final profile should read like a map drawn by a careful curator, not a dump of folders, and not a cloud of generic terms.

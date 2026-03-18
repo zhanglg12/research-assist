@@ -5,16 +5,16 @@ description: A lightweight arXiv literature digest skill for OpenClaw, with Zote
 
 # Research Assist Skill
 
-An OpenClaw skill that turns Zotero evidence into a profile-driven arXiv digest, then lets the host agent sharpen the final shortlist.
+An OpenClaw skill that turns Zotero evidence into a profile-driven literature digest, using arXiv by default and optionally expanding recall with OpenAlex and Semantic Scholar before deduplication.
 
 ## CLI Usage
 
 ```bash
-# Full digest: profile check → arXiv retrieval → rank → markdown output
+# Full digest: profile check → literature retrieval → rank → markdown output
 uv run --project ~/.openclaw/skills/research-assist \
   research-assist --action digest --config ~/.openclaw/skills/research-assist/config.json
 
-# Ad-hoc arXiv search
+# Ad-hoc literature search
 uv run --project ~/.openclaw/skills/research-assist \
   research-assist --action search --query "gaussian process" --top 5
 
@@ -72,7 +72,7 @@ config.json (OpenClaw skill config)
     ↓
 openclaw_runner.py (CLI entry, markdown to stdout)
     ├── profile_refresh_policy  → check if profile needs update
-    ├── pipeline.py             → arXiv Atom API retrieval
+    ├── pipeline.py             → multi-source literature retrieval (arXiv default)
     ├── ranker.py               → two-signal scoring (map_match + zotero_semantic)
     └── format_*_markdown()     → structured markdown output
 ```
@@ -100,15 +100,18 @@ OpenClaw generation rule:
 - use representative papers as the main evidence for what each region actually contains
 - use semantic search as the blending layer that connects nearby themes across collections
 - write interests that feel like stable method axes, not loose keyword bags
+- aim for about 6 interests by default; usually stay in the 4-8 range unless the evidence strongly says otherwise
+- if the draft has too few interests, split mixed regions by real method differences; if it has too many, merge nearby regions that share one stable method axis
 - if collection names and paper content disagree, trust the papers more than the folder label
 - if summary terms are frequent but too generic, use them only to refine wording, not to define the map
 - the final profile should read like a compact map of the user's research territory: a few clear regions, each with short labels and retrieval-friendly aliases
 
 ### 2. `retrieval`
 
-- query arXiv Atom API per interest
+- query arXiv by default, optionally add OpenAlex and Semantic Scholar per interest
+- expand the paper pool before ranking when multiple sources are enabled
 - generate structured candidate JSON with full provenance
-- deduplicate across interests
+- deduplicate across interests and across enabled sources
 
 ### 3. `review`
 
