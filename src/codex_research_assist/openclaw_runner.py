@@ -549,8 +549,12 @@ def _safe_positive_int(value: object, default: int) -> int:
     """Best-effort conversion for integer-like config values."""
     if isinstance(value, bool):
         return default
-    if isinstance(value, int):
-        return value if value > 0 else default
+    if isinstance(value, (int, float)):
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError, OverflowError):
+            return default
+        return parsed if parsed > 0 else default
     if isinstance(value, str):
         stripped = value.strip()
         if stripped.isdigit():

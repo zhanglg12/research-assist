@@ -91,6 +91,8 @@ class DigestSummaryTest(unittest.TestCase):
 
     def test_safe_positive_int(self) -> None:
         self.assertEqual(_safe_positive_int(15, 7), 15)
+        self.assertEqual(_safe_positive_int(30.0, 7), 30)
+        self.assertEqual(_safe_positive_int(30.8, 7), 30)
         self.assertEqual(_safe_positive_int("30", 7), 30)
         self.assertEqual(_safe_positive_int("0", 7), 7)
         self.assertEqual(_safe_positive_int("bad", 7), 7)
