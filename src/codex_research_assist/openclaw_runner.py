@@ -545,10 +545,31 @@ def _toml_quote(value: str) -> str:
     return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
+def _safe_positive_int(value: object, default: int) -> int:
+    """Best-effort conversion for integer-like config values."""
+    if isinstance(value, bool):
+        return default
+    if isinstance(value, (int, float)):
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError, OverflowError):
+            return default
+        return parsed if parsed > 0 else default
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped.isdigit():
+            parsed = int(stripped)
+            return parsed if parsed > 0 else default
+    return default
+
+
 def create_temp_toml_config(config: dict, profile_path: Path, output_root: Path) -> Path:
     """Write a minimal TOML config consumed by run_pipeline / evaluate_profile_refresh_policy."""
     retrieval_defaults = config.get("retrieval_defaults", {})
-    max_age_days = retrieval_defaults.get("max_age_days", 7)
+    max_age_days = _safe_positive_int(
+        retrieval_defaults.get("max_age_days", 7) if isinstance(retrieval_defaults, dict) else 7,
+        7,
+    )
 
     toml_lines = [
         f"profile_path = {_toml_quote(profile_path.as_posix())}",
@@ -562,7 +583,7 @@ def create_temp_toml_config(config: dict, profile_path: Path, output_root: Path)
         "",
         "[controller.profile_refresh]",
         "enabled = true",
-        f"max_age_days = {int(max_age_days)}",
+        f"max_age_days = {max_age_days}",
         "refresh_if_missing = true",
         "",
     ]

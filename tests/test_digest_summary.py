@@ -8,6 +8,7 @@ from pathlib import Path
 from codex_research_assist.digest_summary import summary_output_path, write_digest_run_summary
 from codex_research_assist.openclaw_runner import _format_digest_email_body
 from codex_research_assist.openclaw_runner import _filter_final_digest_candidates, _persist_ranked_candidate_paths
+from codex_research_assist.openclaw_runner import _safe_positive_int, create_temp_toml_config
 
 
 class DigestSummaryTest(unittest.TestCase):
@@ -87,6 +88,30 @@ class DigestSummaryTest(unittest.TestCase):
         self.assertIn("Current profile", html)
         self.assertIn("03/12", html)
         self.assertIn("every 60 days", html)
+
+    def test_safe_positive_int(self) -> None:
+        self.assertEqual(_safe_positive_int(15, 7), 15)
+        self.assertEqual(_safe_positive_int(30.0, 7), 30)
+        self.assertEqual(_safe_positive_int(30.8, 7), 30)
+        self.assertEqual(_safe_positive_int("30", 7), 30)
+        self.assertEqual(_safe_positive_int("0", 7), 7)
+        self.assertEqual(_safe_positive_int("bad", 7), 7)
+        self.assertEqual(_safe_positive_int(True, 7), 7)
+
+    def test_create_temp_toml_config_handles_invalid_max_age_days(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            config = {"retrieval_defaults": {"max_age_days": "invalid"}}
+            temp_toml = create_temp_toml_config(
+                config,
+                profile_path=root / "profiles" / "research-interest.json",
+                output_root=root / "reports",
+            )
+            try:
+                text = temp_toml.read_text(encoding="utf-8")
+            finally:
+                temp_toml.unlink(missing_ok=True)
+            self.assertIn("max_age_days = 7", text)
 
 
 if __name__ == "__main__":
